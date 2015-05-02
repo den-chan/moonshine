@@ -8,9 +8,27 @@
   </head>
   <body onload="init()">
     <div id="serial-chat">
-      <div class="conversation"></div>
-      <input type="text" class="message" />
-      <button class="send">Send</button>
+      <div class="connect">
+        <div class="create">
+          <span>Create invite</span>
+        </div>
+        <div class="redeem">
+          <span>Redeem invite</span>
+        </div>
+      </div>
+      <div class="exchange hide">
+        <div class="ticket">
+          <textarea></textarea>
+        </div>
+        <div class="info">
+          <span></span>
+        </div>
+      </div>
+      <div class="room">
+        <div class="conversation"></div>
+        <textarea type="text" class="message"></textarea>
+        <button class="send">Send</button>
+      </div>
     </div>
     <div id="stamps">
       <div class="chat-message"></div>
