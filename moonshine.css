@@ -64,8 +64,7 @@ html, body {
 }
 
 #serial-chat.open > .room {
-  display: block;
-  margin: .5em
+  display: block
 }
 
 #serial-chat.open .conversation {
@@ -83,7 +82,7 @@ html, body {
 
 #serial-chat textarea.message {
   border: 1px solid #999;
-  margin-right: .7em;
+  margin: 0 .7em .5em 0;
   padding: .2em .4em;
   font-size: large;
   font-family: serif;
