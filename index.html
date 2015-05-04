@@ -7,8 +7,8 @@
     <link href="moonshine.css" rel="stylesheet" />
   </head>
   <body onload="init()">
-    <div id="serial-chat">
-      <div class="connect">
+    <div id="page">
+      <div id="connect">
         <div class="create">
           <span>Create invite</span>
         </div>
@@ -16,7 +16,7 @@
           <span>Redeem invite</span>
         </div>
       </div>
-      <div class="exchange hide">
+      <div id="exchange" class="hide">
         <div class="ticket">
           <textarea></textarea>
         </div>
@@ -24,14 +24,29 @@
           <span></span>
         </div>
       </div>
-      <div class="room">
+      <div id="room" class="hide">
+        <div class="close">
+          <span>Abandon session</span>
+        </div>
         <div class="conversation"></div>
+        <input type="text" class="message-title" placeholder="New post"/>
         <textarea type="text" class="message" placeholder="Ctrl-enter sends message"></textarea>
         <button class="send">Send</button>
       </div>
-    </div>
-    <div id="stamps">
-      <div class="chat-message"></div>
+      <div id="stamps">
+        <div class="page-item">
+          <div class="item">
+            <h1 class="title"></h1>
+            <div class="body"></div>
+          </div>
+          <div class="comments"></div>
+          <textarea type="text" class="message" placeholder="Ctrl-enter sends message"></textarea>
+          <button class="send">Send</button>
+        </div>
+        <div class="item-comment">
+          <span></span>
+        </div>
+      </div>
     </div>
   </body>
 </html>

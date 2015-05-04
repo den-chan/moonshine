@@ -2,10 +2,29 @@
   box-sizing: border-box
 }
 
-html, body {
-  padding: 0;
-  margin: 0;
-  width: 100%
+html {
+  height: 100%
+}
+body {
+  display: block;
+  position: absolute;
+  height: auto;
+  bottom: 0;
+  top: 0;
+  left: 0;
+  right: 0;
+  margin: 0
+}
+  
+#page {
+  display: -webkit-flex;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100%;
+  overflow-y: auto;
+  word-wrap: break-word;
+  background-color: #27c142
 }
 
 #stamps, .hide, .room {
@@ -19,79 +38,117 @@ html, body {
   color: blue
 }
 
-#serial-chat {
-  margin: .5em;
-  border: 1px solid #000;
-  width: 70%;
-  word-wrap: break-word
-}
-
-#serial-chat.open {
+#page.open {
   border: none
 }
 
-#serial-chat > .connect {
-  margin-bottom: .5em
+#connect {
+  font-family: sans-serif
 }
 
-#serial-chat > .connect > div {
+#connect > div {
   margin: .5em;
   padding: 1em;
-  background-color: #ccc;
   text-align: center;
-  cursor: pointer
+  cursor: pointer;
+  color: #fff;
+  border: 3px solid white;
+  border-radius: .8em;
+}
+#connect > div:hover {
+  background-color: rgba(256, 256, 256, .3)
 }
 
-#serial-chat > .exchange > div {
+#exchange > div {
   margin: .5em
 }
 
-#serial-chat .ticket {
-  padding-right: 7px
+#exchange > .ticket {
+  padding-right: 7px;
+  color: #fff;
+  border: 3px solid white;
+  border-radius: .8em;
+  padding: .2em
 }
 
-#serial-chat .ticket > textarea {
+#exchange > .ticket > textarea {
   resize: none;
   width: 100%;
   height: 7.6em;
-  overflow: hidden
+  overflow: hidden;
+  background-color: transparent;
+  color: #fff;
+  border: 0;
+  outline: 0;
+  margin-bottom: -.25em;
+  width: 30em
+}
+::selection {
+  background: rgba(252, 67, 52, .99)
+}
+::-moz-selection {
+  background: rgba(252, 67, 52, .99)
 }
 
-#serial-chat .exchange > .info {
+#exchange > .info {
   text-align: center;
-  background-color: #ccc;
-  padding: 1em
+  padding: 1em;
+  color: #fff;
+  font-family: sans-serif
 }
 
-#serial-chat.open > .room {
-  display: block
+.open > #room {
+  display: block;
+  width: 100%
 }
 
-#serial-chat.open .conversation {
-  border: 1px solid #000;
+#room > .close {
+  cursor: pointer;
+  color: #fff;
+  font-family: sans-serif;
+  border: 3px solid #fff;
+  padding: .5em .8em;
+  border-radius: .8em;
+  position: absolute;
+  top: 3px;
+  right: 3px
+}
+#room > .close:hover {
+  background-color: rgba(256, 256, 256, .3)
+}
+
+#room > .conversation {
   margin-bottom: .5em;
-  padding: .3em;
-  height: 20em;
-  overflow-y: auto;
-  resize: vertical
+  padding: .3em
 }
 
-#serial-chat.open .conversation > div {
-  padding: .1em .5em;
+#room > .conversation > div {
+  padding: .1em .5em
 }
 
-#serial-chat textarea.message {
-  border: 1px solid #999;
+#room > input.message-title {
   margin: 0 .7em .5em 0;
   padding: .2em .4em;
+  border: 0;
+  outline: 0;
   font-size: large;
   font-family: serif;
   width: 30em;
-  height: 5em;
-  float: left
+  display: block
 }
 
-#serial-chat button.send {
+#room textarea.message {
+  margin: 0 .7em .5em 0;
+  padding: .2em .4em;
+  border: 0;
+  outline: 0;
+  font-size: large;
+  font-family: serif;
+  width: 30em;
+  height: 5em
+}
+
+#room button.send {
   border: 1px solid #999;
   padding: .2em .6em;
   border-radius: 2px;
@@ -99,5 +156,22 @@ html, body {
   font-size: large;
   font-family: serif;
   cursor: pointer;
-  float: right
+  display: block
+}
+
+.item {
+  background-color: #b6ef56;
+  padding: 1em;
+  margin-bottom: .5em;
+  width: 70%;
+  min-width: 30em;
+}
+
+.item > h1 {
+  margin: 0;
+  font-size: x-large;
+}
+
+.item-comment {
+  margin: .2em
 }
