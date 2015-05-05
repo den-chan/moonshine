@@ -32,9 +32,10 @@ $.merge($, {
     return el
   },
   addAttr: function (el, ah) { for (var a in ah) el.setAttribute(a, ah[a]) },
-  insert: function (pe, ce, c, fn) {
+  insert: function (pe, ce, fn, gn) {
+    ce.parentNode != pe || pe.removeChild(ce);
     var j = pe.childNodes.length;
-    while (j > 0 && fn(ce.getAttribute(c), pe.childNodes[j - 1].getAttribute(c))) j--;
+    while (j > 0 && gn(fn(ce), fn(pe.childNodes[j - 1]))) j--;
     j == pe.childNodes.length ? pe.appendChild(ce) : pe.insertBefore(ce, pe.childNodes[j])
   },
   compress: function (s) {
@@ -69,16 +70,28 @@ function init() {
       
     pc, dc, nilfun = function () {},
     action, pageState = {},
+    userState = new (function () {
+      return {
+        get public() {
+          var state = {}, a = ["id"], b = -1;
+          while (a[++b]) state[a[b]] = this[a[b]];
+          return state
+        }
+      }
+    })(),
 
-    sendButton = $("#room button.send"),
     ticketTA = $.addEvent($("#exchange > .ticket > textarea"), "click", function () { this.select() }),
     ticketInfo = $("#exchange > .info > span");
   
   $.addEvent($("body"), "beforeunload", closeChannel);
-  $.addEvent($("#room > .close"), "click", closeChannel);
+  $.addEvent($("#room > nav > .close"), "click", closeChannel);
+  $.addEvent($("#room > nav > .open-new"), "click", function () {
+    $.removeClass($("#room > .new-post"), "hide");
+    $("#room > .new-post > input.message-title").focus()
+  });
 
-  $.addEvent($("#room > button.send"), "click", sendMessage);
-  $.addEvent($("#room > textarea.message"), "keyup", function (e) {
+  $.addEvent($("#room > .new-post > button.send"), "click", sendMessage);
+  $.addEvent($("#room > .new-post > textarea.message"), "keyup", function (e) {
     if (e.keyCode == 13 && e.ctrlKey === true) sendMessage.bind(e.target)();
     return false
   });
@@ -88,7 +101,8 @@ function init() {
     $.merge(pc = new RTCPeerConnection(servers, pcConstraint), {
       onicecandidate: function (e) {
         if (e.candidate == null) {
-          ticketTA.value = $.compress(JSON.stringify(pc.localDescription));
+          userState.id = $.hash(Date.now() + pc.localDescription.sdp);
+          ticketTA.value = $.compress(pc.localDescription.sdp);
           ticketTA.select()
         }
       },
@@ -96,7 +110,7 @@ function init() {
     });
     $.addEvent(ticketTA, "cut copy", function () {
       $.addEvent(ticketTA, "paste", function () { setTimeout(function () {
-        var adesc = new RTCSessionDescription(JSON.parse($.decompress(ticketTA.value)));
+        var adesc = new RTCSessionDescription({sdp: $.decompress(ticketTA.value).replace(/ +$/, ""), type: "answer"});
         pc.setRemoteDescription(adesc)
       }.bind(this), 0) });
       ticketInfo.innerHTML = "They need to give you their stub<br />Paste it here"
@@ -115,14 +129,15 @@ function init() {
       onicecandidate: function (e) {
         if (e.candidate == null) {
           ticketInfo.innerHTML = "Here is your ticket stub<br />Pass it back";
-          ticketTA.value = $.compress(JSON.stringify(pc.localDescription));
+          userState.id = $.hash(Date.now() + pc.localDescription.sdp);
+          ticketTA.value = $.compress(pc.localDescription.sdp);
           ticketTA.select()
         }
       },
       onsignalingstatechange: function () { pc.signalingState != "closed" || closeChannel() }
     });
     $.addEvent(ticketTA, "paste", function () { setTimeout(function () {
-      var odesc = new RTCSessionDescription(JSON.parse($.decompress(ticketTA.value)));
+      var odesc = new RTCSessionDescription({sdp: $.decompress(ticketTA.value).replace(/ +$/, ""), type: "offer"});
       pc.setRemoteDescription(odesc, function () {
         pc.createAnswer( function (adesc) { pc.setLocalDescription(adesc) }, nilfun )
       }, nilfun)
@@ -136,13 +151,14 @@ function init() {
   function openChannel() {
     $.addClass($("#page"), "open");
     $.addClass($("#exchange"), "hide");
-    $("#room > input.message-title").focus()
+    $("#room > nav > .close").innerHTML = "Abandon " + userState.id;
+    $("#room > .new-post > input.message-title").focus()
   }
   
   function closeChannel () {
     $.removeClass($("#page"), "open");
     $.removeClass($("#connect"), "hide");
-    $("#room > .conversation").innerHTML = "";
+    $("#room > .conversation").innerHTML = $("#exchange > .ticket > textarea").value = "";
     if (pc.signalingState != "closed") {
       action == "closed" || dc.send( JSON.stringify({ action: "closed" }) );
       pc.close()
@@ -158,24 +174,27 @@ function init() {
   
   function sendMessage() { //check message length
     var ta, payload, ts = Date.now();
-    if (this.parentNode.id == "room" && (ta = $("#room > textarea.message")).value) {
+    if (this.parentNode.parentNode.id == "room" && (ta = $("#room > .new-post > textarea.message")).value) {
       updatePage(payload = {
         items: [{
           id: "item-" + $.hash(ts + ta.value),
           timestamp: ts,
           title: $.bind(this.parentNode)("input.message-title").value,
-          body: ta.value
+          body: ta.value,
+          user_data: userState.public
         }]
       });
-      $.bind(this.parentNode)("input.message-title").value = ""
-    } else if (this.parentNode.className == "page-item" && (ta = $.bind(this.parentNode)("textarea.message")).value) {
+      $.bind(this.parentNode)("input.message-title").value = "";
+      $.addClass($("#room > .new-post"), "hide")
+    } else if (this.parentNode.parentNode.className == "page-item" && (ta = $.bind(this.parentNode)("textarea.message")).value) {
       updatePage(payload = {
         items: [{
-          id: ta.parentNode.id,
+          id: ta.parentNode.parentNode.id,
           comments: [{
             id: "comment-" + $.hash(ts + ta.value),
             timestamp: ts,
-            body: ta.value
+            body: ta.value,
+            user_data: userState.public
           }]
         }]
       })
@@ -189,25 +208,40 @@ function init() {
       payload.items[i].comments = payload.items[i].comments || [];
       iE =
         $("#" + payload.items[i].id) ||
-        (function (iE_) {$.bind(iE)("textarea.message")
+        (function (iE_) {
           $.addAttr(iE_, {id: payload.items[i].id, timestamp: payload.items[i].timestamp});
           $.bind(iE_)(".title").innerHTML = payload.items[i].title;
           $.bind(iE_)(".body").innerHTML = payload.items[i].body;
+          $.bind(iE_)(".user").innerHTML = "u:" + payload.items[i].user_data.id;
           return iE_
         })($("#stamps > .page-item").cloneNode(true));
       for (c = 0; c < payload.items[i].comments.length; c++) {
         $.insert($.bind(iE)(".comments"), (function (cE_) {
           $.addAttr(cE_, {id: payload.items[i].comments[c].id, timestamp: payload.items[i].comments[c].timestamp}); //TODO user_data
           $.bind(cE_)("span").innerHTML = payload.items[i].comments[c].body;
+          $.bind(cE_)(".user").innerHTML = "u:" + payload.items[i].comments[c].user_data.id;
           return cE_
-        })($("#stamps > .item-comment").cloneNode(true)), "timestamp", function (a, b) {return a < b})
+        })($("#stamps > .item-comment").cloneNode(true)), function (a) {return a.getAttribute("timestamp")}, function (a, b) {return a < b});
+        if ($.bind(iE)(".commenting.hide")) $.bind(iE)(".item > .unread").dataset.num++
       }
-      $.insert($("#room > .conversation"), iE, "timestamp", function (a, b) {return a > b});
-      $.addEvent($.bind(iE)("button.send"), "click", sendMessage);
-      $.addEvent($.bind(iE)("textarea.message"), "keyup", function (e) {
-        if (e.keyCode == 13 && e.ctrlKey === true) sendMessage.bind(e.target)();
-        return false
-      });
+      $.insert( $("#room > .conversation"), iE, function (a) { return ($.bind(a)(".comments > :last-child") || a).getAttribute("timestamp") }, function (a, b) {return a > b} );
+      if (payload.items[i].timestamp) {
+        $.addEvent($.bind(iE)("button.send"), "click", sendMessage);
+        $.addEvent($.bind(iE)("textarea.message"), "keyup", function (e) {
+          if (e.keyCode == 13 && e.ctrlKey === true) sendMessage.bind(e.target)();
+          return false
+        });
+        $.addEvent($.bind(iE)(".toggle"), "click", function () {
+          if (this.innerHTML == "[reply]") {
+            this.innerHTML = "[minimise]";
+            $.removeClass($.bind(this.parentNode.parentNode)(".commenting"), "hide");
+            $.bind(this.parentNode)(".unread").dataset.num = 0;
+          } else if (this.innerHTML == "[minimise]") {
+            this.innerHTML = "[reply]";
+            $.addClass($.bind(this.parentNode.parentNode)(".commenting"), "hide")
+          }
+        })
+      }
     }
   }
 

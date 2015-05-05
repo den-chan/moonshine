@@ -17,29 +17,20 @@ body {
 }
   
 #page {
+  min-height: 100%;
+  overflow-y: auto;
+  background-color: #27c142
+}
+
+#page:not(.open) {
   display: -webkit-flex;
   display: flex;
   justify-content: center;
   align-items: center;
-  min-height: 100%;
-  overflow-y: auto;
-  word-wrap: break-word;
-  background-color: #27c142
 }
 
-#stamps, .hide, .room {
+#stamps, .hide {
   display: none
-}
-
-.alice {
-  color: green
-}
-.bob {
-  color: blue
-}
-
-#page.open {
-  border: none
 }
 
 #connect {
@@ -102,18 +93,22 @@ body {
   width: 100%
 }
 
-#room > .close {
+#room > nav {
+  position: absolute;
+  top: 3px;
+  right: 3px
+}
+
+#room > nav > div {
   cursor: pointer;
   color: #fff;
   font-family: sans-serif;
   border: 3px solid #fff;
   padding: .5em .8em;
   border-radius: .8em;
-  position: absolute;
-  top: 3px;
-  right: 3px
+  margin-bottom: 3px
 }
-#room > .close:hover {
+#room > nav > div:hover {
   background-color: rgba(256, 256, 256, .3)
 }
 
@@ -126,7 +121,7 @@ body {
   padding: .1em .5em
 }
 
-#room > input.message-title {
+#room > .new-post > input.message-title {
   margin: 0 .7em .5em 0;
   padding: .2em .4em;
   border: 0;
@@ -151,8 +146,7 @@ body {
 #room button.send {
   border: 1px solid #999;
   padding: .2em .6em;
-  border-radius: 2px;
-  margin-left: -2px;
+  border-radius: 5px;
   font-size: large;
   font-family: serif;
   cursor: pointer;
@@ -170,6 +164,34 @@ body {
 .item > h1 {
   margin: 0;
   font-size: x-large;
+  display: inline
+}
+
+.item > .user,
+.item-comment > .user {
+  display: inline;
+  background-color: #e37cb0
+}
+
+.item > span.toggle {
+  cursor: pointer;
+  clear: right
+}
+
+.item > span.unread {
+  clear: right;
+  background-color: #e91404;
+  color: #fff;
+  padding: .1em .4em;
+  border-radius: .7em;
+  font-family: sans-serif;
+  font-size: small;
+}
+.item > span.unread:before {
+  content: attr(data-num)
+}
+.item > span.unread[data-num="0"] {
+  display: none
 }
 
 .item-comment {

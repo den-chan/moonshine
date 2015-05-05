@@ -25,25 +25,38 @@
         </div>
       </div>
       <div id="room" class="hide">
-        <div class="close">
-          <span>Abandon session</span>
-        </div>
+        <nav>
+          <div class="close">
+            <span></span>
+          </div>
+          <div class="open-new">
+            <span>New post</span>
+          </div>
+        </nav>
         <div class="conversation"></div>
-        <input type="text" class="message-title" placeholder="New post"/>
-        <textarea type="text" class="message" placeholder="Ctrl-enter sends message"></textarea>
-        <button class="send">Send</button>
+        <div class="new-post hide">
+          <input type="text" class="message-title" placeholder="New post"/>
+          <textarea type="text" class="message" placeholder="Ctrl-enter sends message"></textarea>
+          <button class="send">Send</button>
+        </div>
       </div>
       <div id="stamps">
         <div class="page-item">
           <div class="item">
             <h1 class="title"></h1>
+            <div class="user"></div>
+            <span class="toggle">[reply]</span>
+            <span class="unread" data-num="0"></span>
             <div class="body"></div>
           </div>
-          <div class="comments"></div>
-          <textarea type="text" class="message" placeholder="Ctrl-enter sends message"></textarea>
-          <button class="send">Send</button>
+          <div class="commenting hide">
+            <div class="comments"></div>
+            <textarea type="text" class="message" placeholder="Ctrl-enter sends message"></textarea>
+            <button class="send">Send</button>
+          </div>
         </div>
         <div class="item-comment">
+          <div class="user"></div>
           <span></span>
         </div>
       </div>
