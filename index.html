@@ -9,11 +9,14 @@
   <body onload="init()">
     <div id="page">
       <div id="connect">
-        <div class="create">
+        <div class="create button">
           <span>Create invite</span>
         </div>
-        <div class="redeem">
+        <div class="redeem button">
           <span>Redeem invite</span>
+        </div>
+        <div class="close button hide">
+          <span></span>
         </div>
       </div>
       <div id="exchange" class="hide">
@@ -25,19 +28,15 @@
         </div>
       </div>
       <div id="room" class="hide">
-        <nav>
-          <div class="close">
-            <span></span>
-          </div>
-          <div class="open-new">
-            <span>New post</span>
-          </div>
-        </nav>
         <div class="conversation"></div>
-        <div class="new-post hide">
+        <div class="new-post posting hide">
           <input type="text" class="message-title" placeholder="New post"/>
           <textarea type="text" class="message" placeholder="Ctrl-enter sends message"></textarea>
-          <button class="send">Send</button>
+          <button class="cancel button-small hide">Cancel</button>
+          <button class="send button-small hide">Send</button>
+        </div>
+        <div class="open-new button">
+          <span>New post</span>
         </div>
       </div>
       <div id="stamps">
@@ -49,10 +48,10 @@
             <span class="unread" data-num="0"></span>
             <div class="body"></div>
           </div>
-          <div class="commenting hide">
-            <div class="comments"></div>
+          <div class="posting hide">
+            <div class="comments hide"></div>
             <textarea type="text" class="message" placeholder="Ctrl-enter sends message"></textarea>
-            <button class="send">Send</button>
+            <button class="send button-small">Send</button>
           </div>
         </div>
         <div class="item-comment">

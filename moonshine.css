@@ -22,22 +22,24 @@ body {
   background-color: #27c142
 }
 
-#page:not(.open) {
+#page > div {
   display: -webkit-flex;
   display: flex;
   justify-content: center;
-  align-items: center;
+  align-content: center;
+  align-items: center
 }
 
 #stamps, .hide {
-  display: none
+  display: none !important
 }
 
 #connect {
-  font-family: sans-serif
+  font-family: sans-serif;
+  flex-direction: row
 }
 
-#connect > div {
+.button {
   margin: .5em;
   padding: 1em;
   text-align: center;
@@ -45,9 +47,14 @@ body {
   color: #fff;
   border: 3px solid white;
   border-radius: .8em;
+  display: inline-block
 }
-#connect > div:hover {
+.button:hover {
   background-color: rgba(256, 256, 256, .3)
+}
+
+#exchange {
+  flex-direction: column
 }
 
 #exchange > div {
@@ -88,41 +95,43 @@ body {
   font-family: sans-serif
 }
 
-.open > #room {
+#room {
+  position: relative;
+  background-color: #a5ea30;
+  margin: 0 auto;
+  width: 80%;
+  flex-flow: row wrap;
+  overflow-y: auto
+}
+#room.active {
   display: block;
-  width: 100%
-}
-
-#room > nav {
-  position: absolute;
-  top: 3px;
-  right: 3px
-}
-
-#room > nav > div {
-  cursor: pointer;
-  color: #fff;
-  font-family: sans-serif;
-  border: 3px solid #fff;
-  padding: .5em .8em;
-  border-radius: .8em;
-  margin-bottom: 3px
-}
-#room > nav > div:hover {
-  background-color: rgba(256, 256, 256, .3)
+  text-align: center
 }
 
 #room > .conversation {
-  margin-bottom: .5em;
-  padding: .3em
+  width: 100%;
+  overflow: auto
+}
+#room.active > .conversation {
+  text-align: left
 }
 
-#room > .conversation > div {
-  padding: .1em .5em
+#room > .conversation[data-comment] > .page-item:not([data-focus]) {
+  display: none
 }
 
-#room > .new-post > input.message-title {
-  margin: 0 .7em .5em 0;
+.posting {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  flex-direction: column;
+}
+.posting > * {
+  margin: .5em auto 0;
+}
+
+.posting > input.message-title,
+.posting > textarea.message {
   padding: .2em .4em;
   border: 0;
   outline: 0;
@@ -131,20 +140,13 @@ body {
   width: 30em;
   display: block
 }
-
-#room textarea.message {
-  margin: 0 .7em .5em 0;
-  padding: .2em .4em;
-  border: 0;
-  outline: 0;
-  font-size: large;
-  font-family: serif;
-  width: 30em;
+.posting > textarea.message {
   height: 5em
 }
 
-#room button.send {
+.button-small {
   border: 1px solid #999;
+  margin: .5em .2em;
   padding: .2em .6em;
   border-radius: 5px;
   font-size: large;
@@ -153,12 +155,14 @@ body {
   display: block
 }
 
-.item {
-  background-color: #b6ef56;
+.page-item {
+}
+
+.item, .comments {
+  background-color: #fff;
+  margin: .5em .5em 0;
   padding: 1em;
-  margin-bottom: .5em;
-  width: 70%;
-  min-width: 30em;
+  border-radius: .8em
 }
 
 .item > h1 {
@@ -167,9 +171,9 @@ body {
   display: inline
 }
 
-.item > .user,
-.item-comment > .user {
+.user {
   display: inline;
+  font-family: monospace;
   background-color: #e37cb0
 }
 
@@ -192,6 +196,10 @@ body {
 }
 .item > span.unread[data-num="0"] {
   display: none
+}
+
+.comments {
+  width: calc(100% - 1em)
 }
 
 .item-comment {
