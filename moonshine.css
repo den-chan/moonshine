@@ -120,18 +120,18 @@ body {
   display: none
 }
 
-.posting {
+.form {
   width: 100%;
   display: flex;
   align-items: center;
   flex-direction: column;
 }
-.posting > * {
+.form > * {
   margin: .5em auto 0;
 }
 
-.posting > input.message-title,
-.posting > textarea.message {
+.form > input.message-title,
+.form > textarea.message {
   padding: .2em .4em;
   border: 0;
   outline: 0;
@@ -140,8 +140,13 @@ body {
   width: 30em;
   display: block
 }
-.posting > textarea.message {
+.form > textarea.message {
   height: 5em
+}
+
+.form > input.message-title:invalid,
+.form > textarea.message:invalid {
+  background-color: #e91404
 }
 
 .button-small {
@@ -153,6 +158,9 @@ body {
   font-family: serif;
   cursor: pointer;
   display: block
+}
+.button-small + .button-small {
+  margin-top: 0;
 }
 
 .page-item {
@@ -204,4 +212,14 @@ body {
 
 .item-comment {
   margin: .2em
+}
+
+p {
+  margin: .5em 0
+}
+
+blockquote {
+  margin: 0;
+  padding: 1em 40px;
+  background-color: #e37cb0;
 }

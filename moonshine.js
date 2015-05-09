@@ -61,12 +61,7 @@ $.merge($, {
     return out
   },
   hash: function(s) {
-    var hash = 0, i, chr, len;
-    if (s.length == 0) return hash;
-    for (i = 0, len = s.length; i < len; i++) {
-      chr = s.charCodeAt(i);
-      hash = ((hash << 5) - hash) + chr >>> 0;
-    }
+    for (var hash = 0, i = 0, hs; i < s.length; i++) hash = ((hash << 5) - hash) + s.charCodeAt(i) >>> 0;
     hs = hash.toString(16);
     return Array(9 - hs.length).join("0") + hs
   },
@@ -75,16 +70,18 @@ $.merge($, {
     id: [],
     fn: null,
     panel: 0,
-    t: 1
+    t: 1,
+    duration: 500
   },
   scrollPanel: function (n, fname, duration) {
+    var a;
     $.scrolling.t = 0;
     $.scrolling.fn = ({
       linear: function (t) { return t * this.endY + (1 - t) * this.startY },
       easing: function (t) {
         return t < .5 ?
           this.startY + 2 * t * t * (this.endY - this.startY) :
-          this.startY - (this.endY - this.startY) * (2 * t * (t - 2) + 1)
+          this.startY - (2 * t * (t - 2) + 1) * (this.endY - this.startY)
       }
     })[fname].bind({startY: window.scrollY, endY: n * window.innerHeight});
     $.scrolling.id.push( setInterval(function (a) {
@@ -96,6 +93,78 @@ $.merge($, {
         clearInterval($.scrolling.id.shift())
       }
     }.bind({d: (a = Math.floor(duration / 10)) > 0 ? a : 1}), 10) )
+  },
+  markdown: function (ta) {
+    var r = $.escape(ta), newline = r.indexOf("\r\n") != -1 ? "\r\n" : r.indexOf("\n") != -1 ? "\n" : "";
+    r = r
+      .replace(new RegExp(" + " + newline, "g"), "<br />" + newline)
+      .replace(/\*\*(.*)\*\*/g, "<strong>$1</strong>")
+      .replace(/^/," ").replace(new RegExp("([^:])//(((?!//).)*)//", "g"), "$1<em>$2</em>").replace(/^ /,"")
+      .replace(/``(.*)``/g, "<code>$1</code>")
+      .replace(/\[\[([^\]|]*)\]\]/g, function ($0, $1) { return "<a href='" + $1.replace(/'/g, "&apos;") + "'>" + $1 + "</a>" })
+      .replace(/\[\[([^|]*)\|([^\]]*)\]\]/g, function ($0, $1, $2) { return "<a href='" + $1.replace(/'/g, "&apos;") + "'>" + $2 + "</a>" });
+    for (var p = (newline == "" ? [r] : r.split(newline + newline)), i = 0; i < p.length; i++) {
+      p[i] = p[i]
+        .replace(/^&gt;(.*)/g, "<blockquote>$1</blockquote>").replace(/^\\&gt;/g, "&gt;")
+        .replace(/(.+)/g, "<p>$1</p>")
+    }
+    r = p.join(newline);
+    return r
+  },
+  escape: function (text) {
+    var div = document.createElement("div");
+    div.appendChild(document.createTextNode(text));
+    return div.innerHTML
+  },
+  validate: function (payload) {
+    var
+      is, i, cs, c, pi = $(".page-item"), ic = $(".item-comment"),
+      iids = (pi instanceof Array ? pi.map(function (e) {return e.id}) : [pi.id]),
+      cids = (ic instanceof Array ? ic.map(function (e) {return e.id}) : [pi.ic]),
+      isPosNum = function (t) { return !isNaN(parseFloat(t)) && isFinite(t) && Math.abs(t) <= Math.pow(2, 53) - 1 && t > 0 },
+      isUserData = function (t) {
+        var k, u = new $.userState();
+        for (k in t) if (u.exporting.indexOf(k) == -1) return false;
+        if (!/u:[0-9a-f]{8}/.test(t.id)) return false;
+        return true
+      };
+    for (is = payload.items, i = 0, iids.pop(), cids.pop(); i < is.length; i++) {
+      if ( !/item-[0-9a-f]{8}/.test(is[i].id) ) return false;
+      if ("timestamp" in is[i]) {
+        if (iids.indexOf(is[i].id) != -1) return false; else iids.push(is[i].id);
+        for (k in is[i]) if (["id", "timestamp", "title", "body", "user_data", "comments"].indexOf(k) == -1) return false;
+        if (!(
+          isPosNum(is[i].timestamp) &&
+          "title" in is[i] && is[i].title.length > 0 && is[i].title.length < $.charlim.title &&
+          "body" in is[i] && is[i].body.length < $.charlim.body &&
+          isUserData(is[i].user_data)
+        )) return false;
+      };
+      if ("comments" in is[i]) {
+        for (cs = is[i].comments, c = 0; c < cs.length; c++) {
+          if (cids.indexOf(cs[c].id) != -1) return false; else cids.push(cs[c].id);
+          for (k in cs[c]) if (["id", "timestamp", "body", "user_data"].indexOf(k) == -1) return false;
+          if (!(
+            "id" in cs[c] && /comment-[0-9a-f]{8}/.test(cs[c].id) &&
+            "timestamp" in cs[c] && isPosNum(cs[c].timestamp) &&
+            "body" in cs[c] && cs[c].body.length < $.charlim.body &&
+            isUserData(cs[c].user_data)
+          )) return false;
+        }
+      }
+    }
+    return true
+  },
+  charlim: { title: 160, body: 5000 },
+  userState: function () {
+    return {
+      get public() {
+        var state = {}, a = -1;
+        while (this.exporting[++a]) state[this.exporting[a]] = this[this.exporting[a]];
+        return state
+      },
+      exporting: ["id"]
+    }
   }
 });
 
@@ -104,32 +173,35 @@ function init() {
     servers = $.ajax("stun.json"),
     pcConstraint = { optional: [{ "RtpDataChannels": false }] },
     dataConstraint = { reliable: false },
-      
+    
     pc, dc, nilfun = function () {},
     action, pageState = {},
-    userState = new (function () {
-      return {
-        get public() {
-          var state = {}, a = ["id"], b = -1;
-          while (a[++b]) state[a[b]] = this[a[b]];
-          return state
-        }
-      }
-    })(),
-
+    userState = new $.userState(),
+    
     ticketTA = $.addEvent($("#exchange > .ticket > textarea"), "click", function () { this.select() }),
     ticketInfo = $("#exchange > .info > span"),
     messageTitle = $("#room > .new-post > .message-title"),
     messageBody = $("#room > .new-post > .message"),
     itemsWindow = $("#room > .conversation");
   
-  $.addEvent(window, "resize", resize);
+  (function () {
+    var running = false;
+    $.addEvent(window, "resize", function() {
+      if (running) return;
+      running = true;
+      requestAnimationFrame(function() {
+        window.dispatchEvent(new CustomEvent("opresize"));
+        running = false;
+      });
+    });
+  })();
+  $.addEvent(window, "opresize", resize);
   resize();
   $.addEvent(window, "scroll", function () {
-    if (Math.abs($.scrolling.fn($.scrolling.t) - window.scrollY - .5) < .5 && Math.abs(1 - $.scrolling.t) > 1e-9) return;
+    if (Math.abs($.scrolling.fn($.scrolling.t) - window.scrollY - .5) < 1 && Math.abs(1 - $.scrolling.t) > 1e-9) return;
     clearInterval($.scrolling.id.shift());
     clearTimeout($.scrolling.tid);
-    $.scrolling.tid = setTimeout(function () { $.scrollPanel($.scrolling.panel = Math.floor(window.scrollY / window.innerHeight + .5), "easing", 500) }, 200)
+    $.scrolling.tid = setTimeout(function () { $.scrollPanel($.scrolling.panel = Math.floor(window.scrollY / window.innerHeight + .5), "easing", $.scrolling.duration) }, 200)
   });
   $.addEvent($("#connect > .close"), "click", closeChannel);
   $.addEvent(window, "beforeunload", closeChannel);
@@ -147,6 +219,8 @@ function init() {
     if (e.keyCode == 13 && e.ctrlKey === true) sendMessage.bind(e.target)();
     return false
   });
+  messageTitle.setAttribute("maxlength", $.charlim.title);
+  messageBody.setAttribute("maxlength", $.charlim.body);
   
   $.addEvent($("#connect > .create"), "click", function () {
     ticketTA.innerHTML = "";
@@ -155,7 +229,7 @@ function init() {
     $.merge(pc = new RTCPeerConnection(servers, pcConstraint), {
       onicecandidate: function (e) {
         if (e.candidate == null) {
-          userState.id = $.hash(Date.now() + pc.localDescription.sdp);
+          userState.id = "u:" + $.hash(Date.now() + pc.localDescription.sdp);
           ticketTA.value = $.compress(pc.localDescription.sdp);
           ticketTA.select()
         }
@@ -181,7 +255,7 @@ function init() {
       onicecandidate: function (e) {
         if (e.candidate == null) {
           ticketInfo.innerHTML = "Here is your ticket stub<br />Pass it back";
-          userState.id = $.hash(Date.now() + pc.localDescription.sdp);
+          userState.id = "u:" + $.hash(Date.now() + pc.localDescription.sdp);
           ticketTA.value = $.compress(pc.localDescription.sdp);
           ticketTA.select()
         }
@@ -197,9 +271,13 @@ function init() {
   });
   
   function resize () {
+    var xh = parseInt($("#page > :first-child").style.height), xs = window.scrollY;
     $("#page > :not(#stamps)").forEach(function (e) { e.style.height = window.innerHeight + "px" });
-    $.scrolling.panel = Math.floor(window.scrollY / window.innerHeight + .5);
-    $.scrollPanel($.scrolling.panel, "linear", 0)
+    if (Math.abs(1 - $.scrolling.t) < 1e-9) { window.scroll(0, $.scrolling.panel * window.innerHeight) }
+    else {
+      window.scroll(0, xs / xh * window.innerHeight);
+      $.scrollPanel($.scrolling.panel, "easing", $.scrolling.duration)
+    }
   }
   
   function toggleNewItem () {
@@ -216,7 +294,7 @@ function init() {
       "#connect > .redeem": "hide", "#connect > .close": "hide"
     });
     messageTitle.focus();
-    $.scrollPanel($.scrolling.panel = 1, "easing", 500)
+    $.scrollPanel($.scrolling.panel = 1, "easing", $.scrolling.duration)
   }
   
   function closeChannel () {
@@ -238,6 +316,7 @@ function init() {
   function sendMessage() { //check message length
     var ta, payload, ts = Date.now();
     if (this.parentNode.parentNode.id == "room" && messageBody.value) {
+      if (messageTitle.value.length > $.charlim.title || messageBody.value.length > $.charlim.body) return false
       updatePage(payload = {
         items: [{
           id: "item-" + $.hash(ts + messageBody.value),
@@ -250,6 +329,7 @@ function init() {
       messageTitle.value = messageBody.value = "";
       toggleNewItem()
     } else if (this.parentNode.parentNode.className == "page-item" && (ta = $.bind(this.parentNode)(".message")).value) {
+      if (ta.value.length > $.charlim.body) return false
       updatePage(payload = {
         items: [{
           id: ta.parentNode.parentNode.id,
@@ -267,30 +347,36 @@ function init() {
   }
 
   function updatePage(payload) { //TODO jQuery
+    if (!$.validate(payload)) {
+      console.log("bad message " + payload.length + " bytes");
+      if (payload.length < 65536) console.log(payload);
+      return
+    }
     for (var i = 0, iE, c, j; i < payload.items.length; i++) {
       payload.items[i].comments = payload.items[i].comments || [];
       iE =
         $("#" + payload.items[i].id) ||
         (function (iE_) {
           $.addAttr(iE_, {id: payload.items[i].id, timestamp: payload.items[i].timestamp});
-          $.bind(iE_)(".title").innerHTML = payload.items[i].title;
-          $.bind(iE_)(".body").innerHTML = payload.items[i].body;
-          $.bind(iE_)(".user").innerHTML = "u:" + payload.items[i].user_data.id;
+          $.bind(iE_)(".title").innerHTML = $.escape(payload.items[i].title);
+          $.bind(iE_)(".body").innerHTML = $.markdown(payload.items[i].body);
+          $.bind(iE_)(".user").innerHTML = payload.items[i].user_data.id;
           return iE_
         })($("#stamps > .page-item").cloneNode(true));
       if (!$.bind(iE)(".comments > *") && payload.items[i].comments.length) $.bind(iE)(".comments").className = "comments";
       for (c = 0; c < payload.items[i].comments.length; c++) {
         $.insert($.bind(iE)(".comments"), (function (cE_) {
           $.addAttr(cE_, {id: payload.items[i].comments[c].id, timestamp: payload.items[i].comments[c].timestamp});
-          $.bind(cE_)("span").innerHTML = payload.items[i].comments[c].body;
-          $.bind(cE_)(".user").innerHTML = "u:" + payload.items[i].comments[c].user_data.id;
+          $.bind(cE_)("span").innerHTML = $.markdown(payload.items[i].comments[c].body);
+          $.bind(cE_)(".user").innerHTML = payload.items[i].comments[c].user_data.id;
           return cE_
         })($("#stamps > .item-comment").cloneNode(true)), function (a) {return a.getAttribute("timestamp")}, function (a, b) {return a < b});
-        if ($.bind(iE)(".posting.hide")) $.bind(iE)(".item > .unread").dataset.num++
+        if ($.bind(iE)(".form.hide")) $.bind(iE)(".item > .unread").dataset.num++
       }
       if (!$(".conversation > *")) $("#room").className = "active";
       $.insert( itemsWindow, iE, function (a) { return ($.bind(a)(".comments > :last-child") || a).getAttribute("timestamp") }, function (a, b) {return a > b} );
       if (payload.items[i].timestamp) {
+        $.bind(iE)(".message").setAttribute("maxlength", $.charlim.body);
         $.addEvent($.bind(iE)(".send"), "click", sendMessage);
         $.addEvent($.bind(iE)(".message"), "keyup", function (e) {
           if (e.keyCode == 13 && e.ctrlKey === true) sendMessage.bind(e.target)();
@@ -299,13 +385,13 @@ function init() {
         $.addEvent($.bind(iE)(".toggle"), "click", function () {
           if (this.innerHTML == "[reply]") {
             this.innerHTML = "[minimise]";
-            $.toggleClasses([["#" + this.parentNode.parentNode.id + " .posting", "hide"], ["#room > .open-new", "hide"]]);
+            $.toggleClasses([["#" + this.parentNode.parentNode.id + " .form", "hide"], ["#room > .open-new", "hide"]]);
             $.addAttr(itemsWindow, {"data-comment":""});
             $.addAttr($("#" + this.parentNode.parentNode.id), {"data-focus":""});
             $.bind(this.parentNode)(".unread").dataset.num = 0
           } else if (this.innerHTML == "[minimise]") {
             this.innerHTML = "[reply]";
-            $.toggleClasses([["#" + this.parentNode.parentNode.id + " .posting", "hide"], ["#room > .open-new", "hide"]]);
+            $.toggleClasses([["#" + this.parentNode.parentNode.id + " .form", "hide"], ["#room > .open-new", "hide"]]);
             $.removeAttr(itemsWindow, "data-comment");
             $.removeAttr($("#" + this.parentNode.parentNode.id), "data-focus")
           }
