@@ -15,6 +15,12 @@ body {
   right: 0;
   margin: 0
 }
+
+ul, ol {
+  list-style: none;
+  margin: 0;
+  padding: 0
+}
   
 #page {
   min-height: 100%;
@@ -22,7 +28,7 @@ body {
   background-color: #27c142
 }
 
-#page > div {
+#page > * {
   display: -webkit-flex;
   display: flex;
   justify-content: center;
@@ -179,7 +185,7 @@ body {
   display: inline
 }
 
-.user {
+.user-id {
   display: inline;
   font-family: monospace;
   background-color: #e37cb0
@@ -192,18 +198,22 @@ body {
 
 .item > span.unread {
   clear: right;
-  background-color: #e91404;
-  color: #fff;
-  padding: .1em .4em;
-  border-radius: .7em;
-  font-family: sans-serif;
-  font-size: small;
 }
 .item > span.unread:before {
   content: attr(data-num)
 }
 .item > span.unread[data-num="0"] {
   display: none
+}
+
+.item > span.unread,
+.connected-user[data-self]:after {
+  background-color: #e91404;
+  color: #fff;
+  padding: .1em .4em;
+  border-radius: .7em;
+  font-family: sans-serif;
+  font-size: small;
 }
 
 .comments {
@@ -221,5 +231,29 @@ p {
 blockquote {
   margin: 0;
   padding: 1em 40px;
-  background-color: #e37cb0;
+  background-color: #e37cb0
+}
+
+#users {
+  background: linear-gradient(45deg, #49cb60 25%, transparent 25%, transparent 50%, #49cb60 50%, #49cb60 75%, transparent 75%);
+  background-size: 30px 30px
+}
+
+.list {
+  width: calc(20% - .5em);
+  height: 80%;
+  background-color: #fff;
+  margin: .5em;
+  border-radius: .8em;
+  padding: 1em
+}
+
+.view {
+  width: 60%;
+  height: 80%;
+  background-color: #a5ea30
+}
+
+.connected-user[data-self]:after {
+  content: "self"
 }
