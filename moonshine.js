@@ -181,6 +181,16 @@ $.merge($, {
         }).length == 0;
       })
     })
+  },
+  usersisct: function () {
+    var arrays = Array.prototype.slice.call(arguments);
+    return arrays.shift().filter(function(v) {
+      return arrays.every(function(a) {
+        return a.filter(function(b) {
+          return b.id != v.id
+        }).length == 0;
+      })
+    })
   }
 });
 
@@ -190,7 +200,7 @@ function init() {
     pcConstraint = { optional: [{ "RtpDataChannels": false }] },
     dataConstraint = { reliable: false },
     
-    pc = [], dc = [], nilfun = function () {}, action,
+    pc = [], dc = [], pcw, dcw, nilfun = function () {},
     pageState = new $.State("Remote"),
     userState = new $.State("Local"),
     
@@ -198,7 +208,8 @@ function init() {
     ticketInfo = $("#exchange > .info > span"),
     messageTitle = $("#room > .new-post > .message-title"),
     messageBody = $("#room > .new-post > .message"),
-    itemsWindow = $("#room > .conversation");
+    itemsWindow = $("#room > .conversation"),
+    userList = $("#users > .list");
   
   (function () {
     var running = false;
@@ -316,11 +327,11 @@ function init() {
     })
   }
   
-  function openChannel() {
+  function openChannel () {
     if (dc.length == 1) {
-      pageState.users = [];
-      dc[0].send( JSON.stringify({ sharestate: { users: [userState.public] } }) );
-      updatePage({ users: [userState.public] });
+      dc[0].send( JSON.stringify({ sharestate: { users: [userState.public] }, action: "open" }) );
+      if (pc[0].ondatachannel !== null) requestConn();
+      updatePage({ users: (pageState.users = [userState.public]) });
       ticketTA.value = "";
       $("#connect > .close").innerHTML = "Abandon " + userState.id;
       $.toggleClasses({
@@ -329,44 +340,122 @@ function init() {
       });
       messageTitle.focus()
     } else {
-      dc[0].send( JSON.stringify({ sharestate: { users: pageState.users } }) );
+      dc[0].send( JSON.stringify({ sharestate: { users: pageState.users }, action: "open" }) );
       $.toggleClasses({ "#connect": "hide", "#exchange": "hide" })
     }
     $.scrollPanel($.scrolling.panel = 1, "easing", $.scrolling.duration)
   }
   
   function closeChannel () {
-    itemsWindow.innerHTML = "";
-    $.toggleClasses({
-      "#page": "open", "#room": "hide active", "#users": "hide",
-      "#connect > .redeem": "hide", "#connect > .close": "hide"
+    $.toggleClasses({ "#page": "open", "#room": "hide", "#users": "hide", "#connect > .redeem": "hide", "#connect > .close": "hide" });
+    $("#room").classList.remove("active");
+    if (this.constructor.name == "RTCDataChannel") closeConn([this]);
+    if (dc.length != 0) {
+      for (var i = 0; i < dc.length; i++) if (dc[i] !== this) dc[i].send( JSON.stringify({
+        sharestate: { users: [userState.public] },
+        action: "close"
+      }) );
+      closeConn(dc)
+    }
+    itemsWindow.innerHTML = userList.innerHTML = "";
+    userState = new $.State("Local");
+    pageState = new $.State("Remote")
+  }
+  
+  function closeConn (is) {
+    for (var i = 0, j; i < is.length; i++) {
+      if (is[i].readyState != "closed") is[i].close();
+      pc[j = dc.indexOf(is[i])] = dc[j] = false;
+    }
+    pc = pc.filter(Boolean);
+    dc = dc.filter(Boolean);
+    if (pc.length == 1) requestConn();
+  }
+  
+  function requestConn () {
+    pcw = new RTCPeerConnection(servers, pcConstraint);
+    pcw.onicecandidate = function (e) {
+      if (e.candidate == null) dc[0].send( JSON.stringify({ sdp: this.localDescription.sdp, action: "req-offer" }) )
+    };
+    dcw = $.merge(pcw[0].createDataChannel('moonConn', {reliable: true}), {
+      onmessage: getMessage,
+      onopen: function () {
+        dc.unshift(dcw);
+        dcw = null;
+        dc[0].send( JSON.stringify({ sharestate: { users: [userState.public] }, action: "open" }) );
+      }
     });
-    for (var i = 0; i < pc.length; i++) {
-      if (pc[i].signalingState != "closed") {
-        if (action != "closed") dc[i].send('{"action":"closed"}');
-        pc[i].close()
-      }
-    }
-    dc = pc = []
+    pcw.createOffer(function (desc) { pcw.setLocalDescription(desc, nilfun, nilfun) }, nilfun)
   }
   
-  function getMessage(e) {
+  function respondConn (sdp) {
+    pcw = new RTCPeerConnection(servers, pcConstraint);
+    $.merge(pcw, {
+      ondatachannel: function (e) {
+        pc.unshift(pcw);
+        pcw = null;
+        dc.unshift($.merge(e.channel || e, { onmessage: getMessage }))
+        dc[0].send( JSON.stringify({ sharestate: { users: [userState.public] }, action: "open" }) )
+      },
+      onicecandidate: function (e) {
+        if (e.candidate == null) pageState.relayc.send( JSON.stringify({ sdp: this.localDescription.sdp, action: "req-answer" }) )
+      }
+    });
+    pcw.setRemoteDescription(new RTCSessionDescription({sdp: sdp, type: "offer"}), function () {
+      pcw.createAnswer( function (adesc) { pcw.setLocalDescription(adesc) }, nilfun )
+    }, nilfun)
+  }
+  
+  function getMessage (e) {
     if (e.data.charCodeAt(0) == 2) return;
-    var data = JSON.parse(e.data);
-    if (data.update) {
-      var i = 0;
-      for (updatePage(data.update); i < dc.length; i++) if (dc.indexOf(this) !== i) dc[i].send(e.data)
-    } else if (data.action) {
-      if ((action = data.action) == "closed") closeChannel();
-    } else if (data.sharestate) {
-      var i, diff = $.usersdiff(data.sharestate.users, pageState.users);
-      if (diff.length > 0 ) {
-        for (updatePage({ users: diff }), i = 0; i < dc.length; i++) dc[i].send( JSON.stringify({sharestate: { users: diff }}) )
+    var data = JSON.parse(e.data), i = 0;
+    if ("update" in data) {
+      for (updatePage(data.update); i < dc.length; i++) if (dc[i] !== this) dc[i].send(e.data)
+    } else if ("sharestate" in data && "action" in data) {
+      if (data.action == "open") {
+        var i, diff = $.usersdiff(data.sharestate.users, pageState.users);
+        if (diff.length > 0) {
+          pageState.users = pageState.users.concat(diff);
+          for (updatePage({ users: diff }); i < dc.length; i++) if (dc[i] !== this) dc[i].send( JSON.stringify({
+            sharestate: { users: diff },
+            action: "open"
+          }) )
+        }
+      } else if (data.action == "close" || data.action == "remove") {
+        var i, isct = $.usersisct(pageState.users, data.sharestate.users);
+        if (isct.length > 0) {
+          pageState.users = $.usersdiff(pageState.users, isct);
+          for (updatePage({ users: isct }); i < dc.length; i++) if (dc[i] !== this) dc[i].send( JSON.stringify({
+            sharestate: { users: isct },
+            action: "remove"
+          }) )
+        }
+        if (data.action == "close") if (dc.length == 1) closeChannel.bind(this)(); else closeConn([this])
+      }
+    } else if ("sdp" in data && "action" in data) {
+      if (data.action == "req-offer") {
+        if (pc.length == 1) {
+          this.send( '{"sdp":"","action":"req-relaya"}' )
+        } else {
+          pageState.relayc = this;
+          (dc[0] == this ? dc[1] : dc[0]).send( JSON.stringify({ sdp: data.sdp, action:"req-relayo" }) )
+        }
+      } else if (data.action == "req-relayo") {
+          pageState.relayc = this;
+          respondConn(data.sdp);
+      } else if (data.action == "req-answer") {
+        pageState.relayc.send( JSON.stringify({ sdp: data.sdp, action:"req-relaya" }) )
+      } else if (data.action == "req-relaya") {
+        if (data.sdp.length !== 0) {
+          pc.unshift(pcw);
+          pc[0].setRemoteDescription(new RTCSessionDescription( {sdp: data.sdp, type: "answer"} ))
+        }
+        pcw = null
       }
     }
   }
   
-  function sendMessage() { //check message length
+  function sendMessage () {
     var ta, payload, ts = Date.now(), i = 0;
     if (this.parentNode.parentNode.id == "room" && messageBody.value) {
       if (messageTitle.value.length > $.charlim.title || messageBody.value.length > $.charlim.body) return false
@@ -399,7 +488,7 @@ function init() {
     for (; i < dc.length; i++) dc[i].send( JSON.stringify({update: payload}) );
   }
 
-  function updatePage(payload) { //TODO jQuery
+  function updatePage (payload) { //TODO jQuery
     if (!$.validate(payload)) {
       var bad = JSON.stringify(payload);
       console.log("bad message " + bad.length + " bytes");
@@ -428,7 +517,7 @@ function init() {
           })($("#stamps > .item-comment").cloneNode(true)), function (a) {return a.getAttribute("timestamp")}, function (a, b) {return a < b});
           if ($.bind(iE)(".form.hide")) $.bind(iE)(".item > .unread").dataset.num++
         }
-        if (!$(".conversation > *")) $("#room").className = "active";
+        if (!$(".conversation > *")) $.toggleClasses({"#room": "active"});
         $.insert( itemsWindow, iE, function (a) { return ($.bind(a)(".comments > :last-child") || a).getAttribute("timestamp") }, function (a, b) {return a > b} );
         if ("timestamp" in payload.items[i]) {
           $.bind(iE)(".message").setAttribute("maxlength", $.charlim.body);
@@ -455,17 +544,16 @@ function init() {
       }
     }
     if ("users" in payload) {
-      for (var i = 0, uE; i < payload.users.length; i++) {
-        uE =
-          $("#" + payload.users[i].id.replace(/:/, "\\:")) ||
-          (function (uE_) {
-            pageState.users.push(payload.users[i]);
+      for (var i = 0, u; i < payload.users.length; i++) {
+        if ( u = $("#" + payload.users[i].id.replace(/:/, "\\:")) ) userList.removeChild(u);
+        else {
+          $.insert( userList, (function (uE_) {
             $.addAttr(uE_, {id: payload.users[i].id});
             if (payload.users[i].id == userState.id) $.addAttr(uE_, {"data-self":""});
             $.bind(uE_)(".user-id").innerHTML = payload.users[i].id;
             return uE_
-          })($("#stamps > .connected-user").cloneNode(true));
-        $.insert( $("#users > .list"), uE, function (a) { return parseInt(a.getAttribute("id").slice(2, 10), 16) }, function (a, b) {return a < b} );
+          })($("#stamps > .connected-user").cloneNode(true)), function (a) { return parseInt(a.getAttribute("id").slice(2, 10), 16) }, function (a, b) {return a < b} );
+        }
       }
     }
   }
