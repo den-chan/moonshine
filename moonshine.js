@@ -1,7 +1,7 @@
 RTCPeerConnection = window.RTCPeerConnection || window.webkitRTCPeerConnection || window.mozRTCPeerConnection;
 RTCSessionDescription = window.RTCSessionDescription || window.mozRTCSessionDescription || window.webkitRTCSessionDescription;
 
-$ = function (sel, a) { return (a = [].slice.call( (this == window ? document : this).querySelectorAll(sel) )).length > 1 ? a : a[0] };
+$ = function (sel, a) { return (a = [].slice.call( (this === window ? document : this).querySelectorAll(sel) )).length > 1 ? a : a[0] };
 $.merge = function (obj1, obj2) {
   for (var a in obj2) obj1[a] = obj2[a];
   return obj1
@@ -12,7 +12,7 @@ $.merge($, {
     xhr.open("GET", url, true);
     xhr.setRequestHeader("Content-type", "application/json");
     xhr.onreadystatechange = function() {
-      if (xhr.readyState == 4 && xhr.status == 200) return JSON.parse(xhr.responseText)
+      if (xhr.readyState === 4 && xhr.status === 200) return JSON.parse(xhr.responseText)
     };
     xhr.send();
   },
@@ -41,10 +41,10 @@ $.merge($, {
     while (b--) el.removeAttribute(a[b])
   },
   insert: function (pe, ce, fn, gn) {
-    ce.parentNode != pe || pe.removeChild(ce);
+    ce.parentNode !== pe || pe.removeChild(ce);
     var j = pe.childNodes.length;
     while (j > 0 && gn(fn(ce), fn(pe.childNodes[j - 1]))) j--;
-    j == pe.childNodes.length ? pe.appendChild(ce) : pe.insertBefore(ce, pe.childNodes[j])
+    j === pe.childNodes.length ? pe.appendChild(ce) : pe.insertBefore(ce, pe.childNodes[j])
   },
   compress: function (s) {
     if (s.length % 2 !== 0) s += " ";
@@ -93,7 +93,7 @@ $.merge($, {
     }.bind({d: (a = Math.floor(duration / 10)) > 0 ? a : 1}), 10) )
   },
   markdown: function (ta) { //TODO: escape **//``
-    var r = $.escape(ta), newline = r.indexOf("\r\n") != -1 ? "\r\n" : r.indexOf("\n") != -1 ? "\n" : "";
+    var r = $.escape(ta), newline = r.indexOf("\r\n") !== -1 ? "\r\n" : r.indexOf("\n") !== -1 ? "\n" : "";
     r = r
       .replace(new RegExp(" + " + newline, "g"), "<br />" + newline)
       .replace(/\*\*(.*)\*\*/g, "<strong>$1</strong>")
@@ -101,7 +101,7 @@ $.merge($, {
       .replace(/``(.*)``/g, "<code>$1</code>")
       .replace(/\[\[([^\]|]*)\]\]/g, function ($0, $1) { return "<a href='" + $1.replace(/'/g, "&apos;") + "'>" + $1 + "</a>" })
       .replace(/\[\[([^|]*)\|([^\]]*)\]\]/g, function ($0, $1, $2) { return "<a href='" + $1.replace(/'/g, "&apos;") + "'>" + $2 + "</a>" });
-    for (var p = (newline == "" ? [r] : r.split(newline + newline)), i = 0; i < p.length; i++) {
+    for (var p = (newline === "" ? [r] : r.split(newline + newline)), i = 0; i < p.length; i++) {
       p[i] = p[i]
         .replace(/^&gt;(.*)/g, "<blockquote>$1</blockquote>").replace(/^\\&gt;/g, "&gt;")
         .replace(/(.+)/g, "<p>$1</p>")
@@ -122,7 +122,7 @@ $.merge($, {
       isPosNum = function (t) { return !isNaN(parseFloat(t)) && isFinite(t) && Math.abs(t) <= Math.pow(2, 53) - 1 && t > 0 },
       isUserData = function (t) {
         var k, u = new $.State("Local");
-        for (k in t) if (u.exporting.indexOf(k) == -1) return false;
+        for (k in t) if (u.exporting.indexOf(k) === -1) return false;
         if (!/u:[0-9a-f]{8}/.test(t.id)) return false;
         return true
       };
@@ -130,8 +130,8 @@ $.merge($, {
       for (is = payload.items, i = 0, iids.pop(), cids.pop(); i < is.length; i++) {
         if ( !/item-[0-9a-f]{8}/.test(is[i].id) ) return false;
         if ("timestamp" in is[i]) {
-          if (iids.indexOf(is[i].id) != -1) return false; else iids.push(is[i].id);
-          for (k in is[i]) if (["id", "timestamp", "title", "body", "user_data", "comments"].indexOf(k) == -1) return false;
+          if (iids.indexOf(is[i].id) !== -1) return false; else iids.push(is[i].id);
+          for (k in is[i]) if (["id", "timestamp", "title", "body", "user_data", "comments"].indexOf(k) === -1) return false;
           if (!(
             isPosNum(is[i].timestamp) &&
             "title" in is[i] && is[i].title.length > 0 && is[i].title.length < $.charlim.title &&
@@ -141,8 +141,8 @@ $.merge($, {
         };
         if ("comments" in is[i]) {
           for (cs = is[i].comments, c = 0; c < cs.length; c++) {
-            if (cids.indexOf(cs[c].id) != -1) return false; else cids.push(cs[c].id);
-            for (k in cs[c]) if (["id", "timestamp", "body", "user_data"].indexOf(k) == -1) return false;
+            if (cids.indexOf(cs[c].id) !== -1) return false; else cids.push(cs[c].id);
+            for (k in cs[c]) if (["id", "timestamp", "body", "user_data"].indexOf(k) === -1) return false;
             if (!(
               "id" in cs[c] && /comment-[0-9a-f]{8}/.test(cs[c].id) &&
               "timestamp" in cs[c] && isPosNum(cs[c].timestamp) &&
@@ -162,14 +162,42 @@ $.merge($, {
   },
   charlim: { title: 160, body: 5000 },
   State: function (type) {
-    var exporting = ({Local: ["id"], Remote: ["users"]})[type];
+    var
+      exporting = ({Local: ["id"], Remote: ["room", "users"]})[type],
+      itemindex = [], //TODO: indexedDB
+      commentindex = {},
+      room = { items: [] };
     return {
       get public() {
         var state = {}, a = -1;
         while (exporting[++a]) state[exporting[a]] = this[exporting[a]];
         return state
       },
-      exporting: exporting
+      exporting: exporting,
+      update: function (payload) {
+        var i, j, ix, jx, flag = false;
+        for (i = 0; i < payload.items.length; i++) {
+          if ((ix = itemindex.indexOf(payload.items[i].id)) !== -1) {
+            if ("comments" in payload.items[i]) {
+              if (!("comments" in room.items[ix])) room.items[ix].comments = [];
+              for (j = 0; j < payload.items[i].comments.length; j++) {
+                if ((jx = commentindex[payload.items[i].id].indexOf(payload.items[i].comments[j].id)) === -1) {
+                  room.items[ix].comments.push(payload.items[i].comments[j]);
+                  commentindex[payload.items[i].id].push(payload.items[i].comments[j].id);
+                  flag = true
+                }
+              }
+            }
+          } else {
+            room.items.push(payload.items[i]);
+            itemindex.push(payload.items[i].id);
+            commentindex[payload.items[i].id] = [];
+            flag = true
+          }
+        }
+        return flag
+      },
+      room: room
     }
   },
   usersdiff: function () {
@@ -177,8 +205,8 @@ $.merge($, {
     return arrays.shift().filter(function(v) {
       return arrays.every(function(a) {
         return a.filter(function(b) {
-          return b.id == v.id
-        }).length == 0;
+          return b.id === v.id
+        }).length === 0;
       })
     })
   },
@@ -187,8 +215,8 @@ $.merge($, {
     return arrays.shift().filter(function(v) {
       return arrays.every(function(a) {
         return a.filter(function(b) {
-          return b.id != v.id
-        }).length == 0;
+          return b.id !== v.id
+        }).length === 0;
       })
     })
   }
@@ -226,17 +254,17 @@ function init() {
   resize();
   $.addEvent(window, "scroll", function () {
     if (Math.abs($.scrolling.fn($.scrolling.t) - window.scrollY - .5) < 1 && Math.abs(1 - $.scrolling.t) > 1e-9) return;
-    if (window.scrollY % window.innerHeight == 0 && Math.abs(1 - $.scrolling.t) < 1e-9) return;
+    if (window.scrollY % window.innerHeight === 0 && Math.abs(1 - $.scrolling.t) < 1e-9) return;
     clearInterval($.scrolling.id.shift());
     clearTimeout($.scrolling.tid);
     $.scrolling.tid = setTimeout(function () { $.scrollPanel($.scrolling.panel = Math.floor(window.scrollY / window.innerHeight + .5), "easing", $.scrolling.duration) }, 200)
   });
   $.addEvent(window, "keydown", function (e) {
-    if (e.keyCode == 33 && $.scrolling.panel > 0) {
+    if (e.keyCode === 33 && $.scrolling.panel > 0) {
       window.scroll(0, (--$.scrolling.panel) * window.innerHeight);
       e.preventDefault()
     };
-    if (e.keyCode == 34 && $.scrolling.panel < $("body").scrollHeight/window.innerHeight - 1) {
+    if (e.keyCode === 34 && $.scrolling.panel < $("body").scrollHeight/window.innerHeight - 1) {
       window.scroll(0, (++$.scrolling.panel) * window.innerHeight);
       e.preventDefault()
     }
@@ -254,7 +282,7 @@ function init() {
 
   $.addEvent($("#room > .new-post > .send"), "click", sendMessage);
   $.addEvent(messageBody, "keyup", function (e) {
-    if (e.keyCode == 13 && e.ctrlKey === true) sendMessage.bind(e.target)();
+    if (e.keyCode === 13 && e.ctrlKey === true) sendMessage.bind(e.target)();
     return false
   });
   messageTitle.setAttribute("maxlength", $.charlim.title);
@@ -267,7 +295,7 @@ function init() {
     pc.unshift(new RTCPeerConnection(servers, pcConstraint));
     $.merge(pc[0], {
       onicecandidate: function (e) {
-        if (e.candidate == null) {
+        if (e.candidate === null) {
           userState.id = userState.id || "u:" + $.hash(Date.now() + this.localDescription.sdp);
           ticketTA.value = $.compress(this.localDescription.sdp);
           ticketTA.select()
@@ -328,56 +356,58 @@ function init() {
   }
   
   function openChannel () {
-    if (dc.length == 1) {
+    if (dc.length === 1) {
       dc[0].send( JSON.stringify({ sharestate: { users: [userState.public] }, action: "open" }) );
       if (pc[0].ondatachannel !== null) requestConn();
       updatePage({ users: (pageState.users = [userState.public]) });
-      ticketTA.value = "";
       $("#connect > .close").innerHTML = "Abandon " + userState.id;
       $.toggleClasses({
         "#page": "open", "#connect": "hide", "#exchange": "hide", "#room": "hide", "#users": "hide",
         "#connect > .redeem": "hide", "#connect > .close": "hide"
       });
-      messageTitle.focus()
     } else {
       dc[0].send( JSON.stringify({ sharestate: { users: pageState.users }, action: "open" }) );
       $.toggleClasses({ "#connect": "hide", "#exchange": "hide" })
     }
-    $.scrollPanel($.scrolling.panel = 1, "easing", $.scrolling.duration)
+    $.scrollPanel($.scrolling.panel = 1, "easing", $.scrolling.duration);
+    if (pageState.room.length !== 0) {
+      this.send( JSON.stringify({ update: pageState.room }) )
+    }
   }
   
   function closeChannel () {
     $.toggleClasses({ "#page": "open", "#room": "hide", "#users": "hide", "#connect > .redeem": "hide", "#connect > .close": "hide" });
+    $.removeAttr(itemsWindow, "data-comment");
     $("#room").classList.remove("active");
-    if (this.constructor.name == "RTCDataChannel") closeConn([this]);
-    if (dc.length != 0) {
+    if (this.constructor.name === "RTCDataChannel") closeConn([this]);
+    if (dc.length !== 0) {
       for (var i = 0; i < dc.length; i++) if (dc[i] !== this) dc[i].send( JSON.stringify({
         sharestate: { users: [userState.public] },
         action: "close"
       }) );
       closeConn(dc)
     }
-    itemsWindow.innerHTML = userList.innerHTML = "";
+    ticketTA.value = itemsWindow.innerHTML = userList.innerHTML = "";
     userState = new $.State("Local");
     pageState = new $.State("Remote")
   }
   
   function closeConn (is) {
     for (var i = 0, j; i < is.length; i++) {
-      if (is[i].readyState != "closed") is[i].close();
+      if (is[i].readyState !== "closed") is[i].close();
       pc[j = dc.indexOf(is[i])] = dc[j] = false;
     }
     pc = pc.filter(Boolean);
     dc = dc.filter(Boolean);
-    if (pc.length == 1) requestConn();
+    if (pc.length === 1) requestConn();
   }
   
   function requestConn () {
     pcw = new RTCPeerConnection(servers, pcConstraint);
     pcw.onicecandidate = function (e) {
-      if (e.candidate == null) dc[0].send( JSON.stringify({ sdp: this.localDescription.sdp, action: "req-offer" }) )
+      if (e.candidate === null) dc[0].send( JSON.stringify({ sdp: this.localDescription.sdp, action: "req-offer" }) )
     };
-    dcw = $.merge(pcw[0].createDataChannel('moonConn', {reliable: true}), {
+    dcw = $.merge(pcw.createDataChannel('moonConn', {reliable: true}), {
       onmessage: getMessage,
       onopen: function () {
         dc.unshift(dcw);
@@ -398,7 +428,7 @@ function init() {
         dc[0].send( JSON.stringify({ sharestate: { users: [userState.public] }, action: "open" }) )
       },
       onicecandidate: function (e) {
-        if (e.candidate == null) pageState.relayc.send( JSON.stringify({ sdp: this.localDescription.sdp, action: "req-answer" }) )
+        if (e.candidate === null) pageState.relayc.send( JSON.stringify({ sdp: this.localDescription.sdp, action: "req-answer" }) )
       }
     });
     pcw.setRemoteDescription(new RTCSessionDescription({sdp: sdp, type: "offer"}), function () {
@@ -407,12 +437,12 @@ function init() {
   }
   
   function getMessage (e) {
-    if (e.data.charCodeAt(0) == 2) return;
+    if (e.data.charCodeAt(0) === 2) return;
     var data = JSON.parse(e.data), i = 0;
     if ("update" in data) {
-      for (updatePage(data.update); i < dc.length; i++) if (dc[i] !== this) dc[i].send(e.data)
+      if (pageState.update(data.update)) for (updatePage(data.update); i < dc.length; i++) if (dc[i] !== this) dc[i].send(e.data)
     } else if ("sharestate" in data && "action" in data) {
-      if (data.action == "open") {
+      if (data.action === "open") {
         var i, diff = $.usersdiff(data.sharestate.users, pageState.users);
         if (diff.length > 0) {
           pageState.users = pageState.users.concat(diff);
@@ -421,7 +451,7 @@ function init() {
             action: "open"
           }) )
         }
-      } else if (data.action == "close" || data.action == "remove") {
+      } else if (data.action === "close" || data.action === "remove") {
         var i, isct = $.usersisct(pageState.users, data.sharestate.users);
         if (isct.length > 0) {
           pageState.users = $.usersdiff(pageState.users, isct);
@@ -430,22 +460,22 @@ function init() {
             action: "remove"
           }) )
         }
-        if (data.action == "close") if (dc.length == 1) closeChannel.bind(this)(); else closeConn([this])
+        if (data.action === "close") if (dc.length === 1) closeChannel.bind(this)(); else closeConn([this])
       }
     } else if ("sdp" in data && "action" in data) {
-      if (data.action == "req-offer") {
-        if (pc.length == 1) {
+      if (data.action === "req-offer") {
+        if (pc.length === 1) {
           this.send( '{"sdp":"","action":"req-relaya"}' )
         } else {
           pageState.relayc = this;
-          (dc[0] == this ? dc[1] : dc[0]).send( JSON.stringify({ sdp: data.sdp, action:"req-relayo" }) )
+          (dc[0] === this ? dc[1] : dc[0]).send( JSON.stringify({ sdp: data.sdp, action:"req-relayo" }) )
         }
-      } else if (data.action == "req-relayo") {
+      } else if (data.action === "req-relayo") {
           pageState.relayc = this;
           respondConn(data.sdp);
-      } else if (data.action == "req-answer") {
+      } else if (data.action === "req-answer") {
         pageState.relayc.send( JSON.stringify({ sdp: data.sdp, action:"req-relaya" }) )
-      } else if (data.action == "req-relaya") {
+      } else if (data.action === "req-relaya") {
         if (data.sdp.length !== 0) {
           pc.unshift(pcw);
           pc[0].setRemoteDescription(new RTCSessionDescription( {sdp: data.sdp, type: "answer"} ))
@@ -457,7 +487,7 @@ function init() {
   
   function sendMessage () {
     var ta, payload, ts = Date.now(), i = 0;
-    if (this.parentNode.parentNode.id == "room" && messageBody.value) {
+    if (this.parentNode.parentNode.id === "room" && messageBody.value) {
       if (messageTitle.value.length > $.charlim.title || messageBody.value.length > $.charlim.body) return false
       updatePage(payload = {
         items: [{
@@ -470,7 +500,7 @@ function init() {
       });
       messageTitle.value = messageBody.value = "";
       toggleNewItem()
-    } else if (this.parentNode.parentNode.className == "page-item" && (ta = $.bind(this.parentNode)(".message")).value) {
+    } else if (this.parentNode.parentNode.className === "page-item" && (ta = $.bind(this.parentNode)(".message")).value) {
       if (ta.value.length > $.charlim.body) return false
       updatePage(payload = {
         items: [{
@@ -485,6 +515,7 @@ function init() {
       });
       ta.value = ""
     } else return false;
+    pageState.update(payload);
     for (; i < dc.length; i++) dc[i].send( JSON.stringify({update: payload}) );
   }
 
@@ -497,7 +528,6 @@ function init() {
     }
     if ("items" in payload) {
       for (var i = 0, iE, c, j; i < payload.items.length; i++) {
-        payload.items[i].comments = payload.items[i].comments || [];
         iE =
           $("#" + payload.items[i].id) ||
           (function (iE_) {
@@ -507,15 +537,17 @@ function init() {
             $.bind(iE_)(".user-id").innerHTML = payload.items[i].user_data.id;
             return iE_
           })($("#stamps > .page-item").cloneNode(true));
-        if (!$.bind(iE)(".comments > *") && payload.items[i].comments.length) $.bind(iE)(".comments").className = "comments";
-        for (c = 0; c < payload.items[i].comments.length; c++) {
-          $.insert($.bind(iE)(".comments"), (function (cE_) {
-            $.addAttr(cE_, {id: payload.items[i].comments[c].id, timestamp: payload.items[i].comments[c].timestamp});
-            $.bind(cE_)("span").innerHTML = $.markdown(payload.items[i].comments[c].body);
-            $.bind(cE_)(".user-id").innerHTML = payload.items[i].comments[c].user_data.id;
-            return cE_
-          })($("#stamps > .item-comment").cloneNode(true)), function (a) {return a.getAttribute("timestamp")}, function (a, b) {return a < b});
-          if ($.bind(iE)(".form.hide")) $.bind(iE)(".item > .unread").dataset.num++
+        if ("comments" in payload.items[i]) {
+          if (!$.bind(iE)(".comments > *")) $.bind(iE)(".comments").className = "comments";
+          for (c = 0; c < payload.items[i].comments.length; c++) {
+            $.insert($.bind(iE)(".comments"), (function (cE_) {
+              $.addAttr(cE_, {id: payload.items[i].comments[c].id, timestamp: payload.items[i].comments[c].timestamp});
+              $.bind(cE_)("span").innerHTML = $.markdown(payload.items[i].comments[c].body);
+              $.bind(cE_)(".user-id").innerHTML = payload.items[i].comments[c].user_data.id;
+              return cE_
+            })($("#stamps > .item-comment").cloneNode(true)), function (a) {return a.getAttribute("timestamp")}, function (a, b) {return a < b});
+            if ($.bind(iE)(".form.hide")) $.bind(iE)(".item > .unread").dataset.num++
+          }
         }
         if (!$(".conversation > *")) $.toggleClasses({"#room": "active"});
         $.insert( itemsWindow, iE, function (a) { return ($.bind(a)(".comments > :last-child") || a).getAttribute("timestamp") }, function (a, b) {return a > b} );
@@ -523,17 +555,17 @@ function init() {
           $.bind(iE)(".message").setAttribute("maxlength", $.charlim.body);
           $.addEvent($.bind(iE)(".send"), "click", sendMessage);
           $.addEvent($.bind(iE)(".message"), "keyup", function (e) {
-            if (e.keyCode == 13 && e.ctrlKey === true) sendMessage.bind(e.target)();
+            if (e.keyCode === 13 && e.ctrlKey === true) sendMessage.bind(e.target)();
             return false
           });
           $.addEvent($.bind(iE)(".toggle"), "click", function () {
-            if (this.innerHTML == "[reply]") {
+            if (this.innerHTML === "[reply]") {
               this.innerHTML = "[minimise]";
               $.toggleClasses([["#" + this.parentNode.parentNode.id + " .form", "hide"], ["#room > .open-new", "hide"]]);
               $.addAttr(itemsWindow, {"data-comment":""});
               $.addAttr($("#" + this.parentNode.parentNode.id), {"data-focus":""});
               $.bind(this.parentNode)(".unread").dataset.num = 0
-            } else if (this.innerHTML == "[minimise]") {
+            } else if (this.innerHTML === "[minimise]") {
               this.innerHTML = "[reply]";
               $.toggleClasses([["#" + this.parentNode.parentNode.id + " .form", "hide"], ["#room > .open-new", "hide"]]);
               $.removeAttr(itemsWindow, "data-comment");
@@ -549,7 +581,7 @@ function init() {
         else {
           $.insert( userList, (function (uE_) {
             $.addAttr(uE_, {id: payload.users[i].id});
-            if (payload.users[i].id == userState.id) $.addAttr(uE_, {"data-self":""});
+            if (payload.users[i].id === userState.id) $.addAttr(uE_, {"data-self":""});
             $.bind(uE_)(".user-id").innerHTML = payload.users[i].id;
             return uE_
           })($("#stamps > .connected-user").cloneNode(true)), function (a) { return parseInt(a.getAttribute("id").slice(2, 10), 16) }, function (a, b) {return a < b} );
