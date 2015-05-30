@@ -1,79 +1,79 @@
 <!doctype html>
 <html lang="en">
-  <head>
-    <title>moonshine</title>
-    <meta charset="UTF-8" />
-    <script src="moonshine.js"></script>
-    <link href="moonshine.css" rel="stylesheet" />
-  </head>
-  <body onload="init()">
-    <ol id="page">
-      <li id="connect">
-        <div class="create button">
-          <span>Create invite</span>
-        </div>
-        <div class="redeem button">
-          <span>Redeem invite</span>
-        </div>
-        <div class="close button hide">
-          <span></span>
-        </div>
-      </li>
-      <li id="exchange" class="hide">
-        <div class="ticket">
-          <textarea></textarea>
-        </div>
-        <div class="info">
-          <span></span>
-        </div>
-      </li>
-      <li id="room" class="hide">
-        <ul class="conversation"></ul>
-        <div class="new-post form hide">
-          <input type="text" class="message-title" placeholder="New post"/>
-          <textarea
-              type="text"
-              class="message"
-              placeholder="Ctrl-enter sends message"
-              title="**bold**&#10;//italic//&#10;``monospaced``&#10;[[link url|text]]&#10;>quote (\>no quote)&#10;&blank;&blank;&crarr;line break&#10;&crarr;&crarr;paragraph"></textarea>
-          <button class="cancel button-small hide">Cancel</button>
-          <button class="send button-small hide">Send</button>
-        </div>
-        <div class="open-new button">
-          <span>New post</span>
-        </div>
-      </li>
-      <li id="users" class="hide">
-        <ul class="list"></ul>
-        <div class="view"></div>
-      </li>
-    </ol>
-    <div id="stamps">
-      <li class="page-item">
-        <div class="item">
-          <h1 class="title"></h1>
-          <div class="user-id"></div>
-          <span class="toggle">[reply]</span>
-          <span class="unread" data-num="0"></span>
-          <div class="body"></div>
-        </div>
-        <div class="form hide">
-          <ol class="comments hide"></ol>
-          <textarea
+<head>
+  <title>moonshine</title>
+  <meta charset="UTF-8">
+  <link href="moonshine.css" rel="stylesheet">
+  <script async src="moonshine.js"></script>
+</head>
+<body onload="init()">
+  <ol id="page">
+    <li id="connect">
+      <div class="create button">
+        <span>Create invite</span>
+      </div>
+      <div class="redeem button">
+        <span>Redeem invite</span>
+      </div>
+      <div class="close button hide">
+        <span></span>
+      </div>
+    </li>
+    <li id="exchange" class="hide">
+      <div class="ticket">
+        <textarea></textarea>
+      </div>
+      <div class="info">
+        <span></span>
+      </div>
+    </li>
+    <li id="room" class="hide">
+      <ul class="conversation"></ul>
+      <div class="new-post form hide">
+        <input type="text" class="message-title" placeholder="New post"/>
+        <textarea
             type="text"
             class="message"
             placeholder="Ctrl-enter sends message"
             title="**bold**&#10;//italic//&#10;``monospaced``&#10;[[link url|text]]&#10;>quote (\>no quote)&#10;&blank;&blank;&crarr;line break&#10;&crarr;&crarr;paragraph"></textarea>
-          <button class="send button-small">Send</button>
-        </div>
-      </li>
-      <li class="item-comment">
+        <button class="cancel button-small hide">Cancel</button>
+        <button class="send button-small hide">Send</button>
+      </div>
+      <div class="open-new button">
+        <span>New post</span>
+      </div>
+    </li>
+    <li id="users" class="hide">
+      <ul class="list"></ul>
+      <div class="view"></div>
+    </li>
+  </ol>
+  <div id="stamps">
+    <li class="page-item">
+      <div class="item">
+        <h1 class="title"></h1>
         <div class="user-id"></div>
-        <span></span>
-      </li>
-      <li class="connected-user">
-        <span class="user-id"></span>
-      </li>
-    </div>
-  </body>
+        <span class="toggle">[reply]</span>
+        <span class="unread" data-num="0"></span>
+        <div class="body"></div>
+      </div>
+      <div class="form hide">
+        <ol class="comments hide"></ol>
+        <textarea
+          type="text"
+          class="message"
+          placeholder="Ctrl-enter sends message"
+          title="**bold**&#10;//italic//&#10;``monospaced``&#10;[[link url|text]]&#10;>quote (\>no quote)&#10;&blank;&blank;&crarr;line break&#10;&crarr;&crarr;paragraph"></textarea>
+        <button class="send button-small">Send</button>
+      </div>
+    </li>
+    <li class="item-comment">
+      <div class="user-id"></div>
+      <span class="body"></span>
+    </li>
+    <li class="connected-user">
+      <span class="user-id"></span>
+    </li>
+  </div>
+</body>
 </html>

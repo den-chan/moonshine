@@ -190,6 +190,10 @@ ul, ol {
   font-family: monospace;
   background-color: #e37cb0
 }
+.user-id.abandoned {
+  background-color: #fff;
+  color: #c00363
+}
 
 .item > span.toggle {
   cursor: pointer;
