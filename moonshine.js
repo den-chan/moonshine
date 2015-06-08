@@ -1,7 +1,7 @@
 RTCPeerConnection = window.RTCPeerConnection || window.webkitRTCPeerConnection || window.mozRTCPeerConnection;
 RTCSessionDescription = window.RTCSessionDescription || window.mozRTCSessionDescription || window.webkitRTCSessionDescription;
 
-var models, $ = function (sel, a) { return (a = [].slice.call( (this === window ? document : this).querySelectorAll(sel) )).length > 1 ? a : a[0] };
+var $ = function (sel, a) { return (a = [].slice.call( (this === window ? document : this).querySelectorAll(sel) )).length > 1 ? a : a[0] };
 $.merge = function (obj1, obj2) {
   var gs;
   for (var a in obj2) {
@@ -26,13 +26,16 @@ $.merge($, {
     while (b--) el.addEventListener(a[b], fn.bind(el), false);
     return el
   },
+  addEvents: function (obj) { for (var el in obj) for (var e in obj[el]) $.addEvent(el ? $(el) : window, e, obj[el][e]) },
   toggleClasses: function (obj) {
-    var a, b, c;
+    var a, b, c, z;
     if (obj instanceof Array) {
       for (a = 0; obj[a]; a++) {
-        if ($(obj[a][0]) === void 0) continue;
+        if ((z = $(obj[a][0])) === void 0) continue;
         b = obj[a][1].split(" "), c = b.length;
-        while (c--) $(obj[a][0]).classList.toggle(b[c])
+        while (c--) z instanceof Array ?
+          $(obj[a][0]).forEach(function (el) { el.classList.toggle(b[c]) }) :
+          $(obj[a][0]).classList.toggle(b[c])
       }
     } else {
       for (a in obj) {
@@ -214,21 +217,21 @@ $.merge($, {
         klass: "user",
         get id () { return user ? user.id : null },
         set id (id) {
-          if (!user.lastRefresh) user = JSON.parse( localStorage.getItem("user") ) || {};
-          localStorage.setItem("user", JSON.stringify( $.merge(user, { id: id }) ));
+          if (!user.lastRefresh) user = JSON.parse(localStorage.user || "{}");
+          localStorage.user = JSON.stringify( $.merge(user, { id: id }) );
         },
         refresh: function () {
-          if (!user || !user.id) user = JSON.parse( localStorage.getItem("user") );
-          else localStorage.setItem( "user", JSON.stringify(user || {}) );
+          if (!user || !user.id) user = JSON.parse(localStorage.user);
+          else localStorage.user = JSON.stringify(user || {});
           return self.user
         },
         get lastRefresh () { return !user || isNaN(user.lastRefresh) ? -1 : user.lastRefresh },
         set lastRefresh (ts) {
-          if (!user || !user.id) user = JSON.parse( localStorage.getItem("user") ) || {};
-          localStorage.setItem("user", JSON.stringify( $.merge(user, { lastRefresh: ts }) ));
+          if (!user || !user.id) user = JSON.parse(localStorage.user || "{}");
+          localStorage.user = JSON.stringify( $.merge(user, { lastRefresh: ts }) );
         },
         get isFresh () {
-          var tmp = JSON.parse( localStorage.getItem("user") );
+          var tmp = JSON.parse(localStorage.user);
           return user && tmp && user.lastRefresh >= tmp.lastRefresh
         },
         clear: function () {
@@ -269,7 +272,7 @@ $.merge($, {
                   room.items.push($.clone(cursor.value));
                   diff.items.push($.clone(cursor.value));
                 } else if ("comments" in room.items[index]) rel[0].items.forEach(function (k, i) { !i || delete diff.items[index][k]  });
-                else diff.items[index] = null;
+                else diff.items[index] = false;
                 cursor.continue()
               };
               rs.transaction.oncomplete = function () { this.db.close(); return resolve(diff) }
@@ -284,7 +287,7 @@ $.merge($, {
                     if (i.comments) {
                       i.comments = i.comments.filter(Boolean);
                       i.comments.length > 0 || delete i.comments
-                    }
+                    };
                     return i
                   }).filter(function (i) { return Object.keys(i).length > 1 });
                   ixs = { r: getindex(room.items, "item_id"), d: getindex(diff.items, "item_id") };
@@ -296,7 +299,7 @@ $.merge($, {
                     delete comment.item_id;
                     room.items[ixs.r].comments.push(comment);
                     diff.items[ixs.d].comments.push(comment)
-                  } else diff.items[ixs.d].comments[index] = null;
+                  } else diff.items[ixs.d].comments[index] = false;
                   cursor.continue()
                 }
                 rs.transaction.oncomplete = function () { this.db.close(); return resolve(diff) }
@@ -308,46 +311,52 @@ $.merge($, {
           })
         },
         update: function (payload) {
-          var count = [], ids, level, flag;
+          var count = [], level, flag;
           function updateLevel (branch, level, localbranch) {
-            var l = Object.keys(rel[level])[0];
+            var l = Object.keys(rel[level])[0], ids;
+            l in localbranch || (localbranch[l] = []);
             if (!(l in branch) || branch[l].length === 0) return Promise.resolve(branch);
-            count.unshift(0); ids = branch[l]
-              .map(function (i, ix) { return [ix, i.id] })
-              .sort(function (a, b) { return a[1] < b[1] ? -1 : a[1] > b[1] ? 1 : 0 });
+            var ids = branch[l].map(function (i, ix) { return [ix, i.id] }).sort(function (a, b) { return a[1]-b[1]?a[1]<b[1]?-1:1:0 });
+            count.unshift(0);
             return getRoomStore(level).then(function (rs) {
               function insert (id) {
-                var l = Object.keys(rel[level])[0], record = {}, recvd = branch[l][id[0]], i = 0;
-                if (rel.length > level + 1) updateLevel(recvd, level + 1, localbranch[l][id[0]])
+                var l = Object.keys(rel[level])[0], localrecord = {}, record = {}, recvd = branch[l][id[0]], i = 0, skip;
                 for (; i < rel[level][l].length; i++) {
-                  if (recvd[rel[level][l][i]] === void 0) return;
-                  record[rel[level][l][i]] = recvd[rel[level][l][i]];
+                  if (i === 1) skip = recvd[rel[level][l][i]] === void 0;
+                  else if ((recvd[rel[level][l][i]] === void 0) + skip === 1) return;
+                  localrecord[rel[level][l][i]] = recvd[rel[level][l][i]];
                 }
-                l in localbranch || (localbranch[l] = []);
-                localbranch[l].push(record);
-                if (level > 0) record[Object.keys(rel[level - 1])[0].replace(/s$/, "") + "_id"] = branch.id;
-                rs.add(record);
-                flag = true
+                if (!skip) {
+                  localbranch[l].push(localrecord);
+                  record = $.clone(localrecord);
+                  if (level > 0) record[Object.keys(rel[level - 1])[0].replace(/s$/, "") + "_id"] = branch.id;
+                  rs.add(record);
+                  flag = true;
+                }
+                if (rel.length > level + 1) return updateLevel(recvd, level + 1, localbranch[l][id[0]]);
               }
               return new Promise(function (resolve) {
                 rs.openCursor().onsuccess = function (e) {
                   var cursor = e.target.result;
-                  if (!cursor) { ids.filter(function (id) { return branch[l][id[0]] !== null }).map(insert); return count.shift() };
-                  var key = cursor.key;
-                  while (key > ids[count[0]][1]) {
-                    !branch[l][ids[count[0]][0]] || insert(ids[count[0]]);
-                    if (++count[0] === ids.length) { branch[l].filter(Boolean); return count.shift() }
+                  function final() {
+                    !(l in branch) || (branch[l] = branch[l].filter(Boolean)), branch[l].length > 0 || delete branch[l];
+                    return Promise.all( ids.filter(function (id) { return (l in branch) && branch[l][id[0]] }).map(insert) )
+                      .then(function () { count.shift(); return resolve() })
                   }
-                  if (key === ids[count[0]][1] ) {
-                    if ( rel[level + 1] && !(Object.keys(rel[level + 1])[0] in branch[l][ids[count[0]][0]]) ) branch[l][ids[count[0]][0]] = null;
+                  if (!cursor) return final();
+                  var key = cursor.key;
+                  while (key > ids[count[0]][1]) if (++count[0] === ids.length) return final();
+                  if (key === ids[count[0]][1]) {
+                    if ( rel[level + 1] && !(Object.keys(rel[level + 1])[0] in branch[l][ids[count[0]][0]]) || !rel[level + 1] ) branch[l][ids[count[0]][0]] = false
                     cursor.continue()
                   } else cursor.continue(ids[count[0]][1])
                 };
-                rs.transaction.oncomplete = function () { this.db.close(); return resolve(branch) }
+                rs.transaction.oncomplete = function () { this.db.close() }
               })
-            }).then(function (diff) {
+            }).then(function () {
+              if (l in branch) branch[l] = branch[l].filter(function (i) { return Object.keys(i).length > 1 });
               if (flag) self.user.lastRefresh = Date.now();
-              return diff
+              return branch
             })
           }
           return updateLevel(payload, 0, room)
@@ -373,7 +382,7 @@ $.merge($, {
                 var cursor = e.target.result, record;
                 if (!cursor) {
                   //if (self.user) self.user.lastRefresh = Date.now()
-                  return Promise.resolve(room);
+                  return resolve(room);
                 }
                 if ((record = cursor.value).action === "create") {
                   if (self.page) return self.page.updateR(record.data);
@@ -382,17 +391,21 @@ $.merge($, {
                 cursor.continue();
                 lastRefresh = Date.now()
               }
-              ts.transaction.oncomplete = function ()  { this.db.close(); return resolve(room) }
+              ts.transaction.oncomplete = function ()  { this.db.close() }
             })
           })
         }
       })
     }
-    var self;
+    var self, ts = Date.now();
+    localStorage.hubts = localStorage.hubts || ts;
     return self = { //TODO: group everything into MVC,
       user: user(),
       page: page(),
-      txpool: txpool()
+      txpool: txpool(),
+      info: {
+        timestamp: ts
+      }
     }
   },
   clone: function (obj) { return JSON.parse(JSON.stringify(obj)) },
@@ -415,6 +428,16 @@ $.merge($, {
         }).length === 0;
       })
     })
+  },
+  peersprune: function (peers) {
+    return peers.filter(function (p) {
+      p.dataChannels = p.dataChannels.filter(function (dc, i) {
+        if (dc.readyState !== "open") p.connections[i] = false;
+        return dc.readyState === "open"
+      });
+      p.connections = p.connections.filter(Boolean);
+      return p.dataChannels.length > 0
+    } );
   }
 });
 
@@ -424,7 +447,7 @@ function init() {
     pcConstraint = { optional: [{ "RtpDataChannels": false }] },
     dataConstraint = { reliable: false },
     
-    pc = [], dc = [], pcw, dcw, nilfun = function () {},// models,
+    nilfun = function () {}, models, peers = [],
     
     ticketTA = $.addEvent($("#exchange > .ticket > textarea"), "click", function () { this.select() }),
     ticketInfo = $("#exchange > .info > span"),
@@ -433,126 +456,102 @@ function init() {
     itemsWindow = $("#room > .conversation"),
     userList = $("#users > .list");
   
-  $.addEvent($("#connect > .close"), "click", closeChannel);
-  if (this === window) $.addEvent(window, "beforeunload", closeChannel);
-  
-  $.addEvent(window, "resize", function() {
-    return new Promise(function (resolve) {
-      requestAnimationFrame(function () { resolve(); window.dispatchEvent(new CustomEvent("opresize")) })
-    })
-  });  
-  $.addEvent(window, "opresize", resize);
-  resize();
-  $.addEvent(window, "scroll", function () {
-    if (!$.scrolling.fn) return;
-    if (Math.abs($.scrolling.fn($.scrolling.t) - window.scrollY - .5) < 1 && Math.abs(1 - $.scrolling.t) > 1e-9) return;
-    if (window.scrollY % window.innerHeight === 0 && Math.abs(1 - $.scrolling.t) < 1e-9) return;
-    clearInterval($.scrolling.id.shift());
-    clearTimeout($.scrolling.tid);
-    $.scrolling.tid = setTimeout(function () {
-      $.scrollPanel($.scrolling.panel = Math.floor(window.scrollY / window.innerHeight + .5), "easing")
-    }, 200)
-  });
-  $.addEvent(window, "keydown", function (e) {
-    if (e.keyCode === 33 && $.scrolling.panel > 0) {
-      window.scroll(0, (--$.scrolling.panel) * window.innerHeight);
-      e.preventDefault()
-    };
-    if (e.keyCode === 34 && $.scrolling.panel < $("body").scrollHeight/window.innerHeight - 1) {
-      window.scroll(0, (++$.scrolling.panel) * window.innerHeight);
-      e.preventDefault()
+  $.addEvents({
+    "#connect > .create": { click: createInvite },
+    "#connect > .redeem": { click: redeemInvite },
+    "#connect > .close": { click: closeChannel },
+    "#room > .open-new":  { click: function () {
+      toggleNewItem();
+      messageTitle.focus()
+    } },
+    "#room > .new-post > .cancel": { click: function () {
+      messageTitle.value = messageBody.value = "";
+      toggleNewItem()
+    } },
+    "#room > .new-post > .send": { click: sendMessage },
+    "#room > .new-post > .message": { keyup: function (e) {
+      if (e.keyCode === 13 && e.ctrlKey === true) sendMessage.bind(e.target)();
+      return false
+    } },
+    "": {
+      beforeunload: closeChannel,
+      resize: function() {
+        return new Promise(function (resolve) {
+          requestAnimationFrame(function () { resolve(); window.dispatchEvent(new CustomEvent("opresize")) })
+        })
+      },
+      opresize: resize,
+      scroll: function () {
+        if (!$.scrolling.fn) return;
+        if (Math.abs($.scrolling.fn($.scrolling.t) - window.scrollY - .5) < 1 && Math.abs(1 - $.scrolling.t) > 1e-9) return;
+        if (window.scrollY % window.innerHeight === 0 && Math.abs(1 - $.scrolling.t) < 1e-9) return;
+        clearInterval($.scrolling.id.shift());
+        clearTimeout($.scrolling.tid);
+        $.scrolling.tid = setTimeout(function () {
+          $.scrollPanel($.scrolling.panel = Math.floor(window.scrollY / window.innerHeight + .5), "easing")
+        }, 200)
+      },
+      keydown: function (e) {
+        if (e.keyCode === 33 && $.scrolling.panel > 0) {
+          window.scroll(0, (--$.scrolling.panel) * window.innerHeight);
+          e.preventDefault()
+        };
+        if (e.keyCode === 34 && $.scrolling.panel < $("body").scrollHeight/window.innerHeight - 1) {
+          window.scroll(0, (++$.scrolling.panel) * window.innerHeight);
+          e.preventDefault()
+        }
+      },
+      storage: function (v) {
+        if (models.info.timestamp == localStorage.hubts && (v = localStorage.newRTCOffer)) {
+          delete localStorage.newRTCOffer;
+          if (peers.length === 0) localStorage.newRTCAnswer = '{"sdp":""}';
+          else peers[0].dataChannels[0].send( JSON.stringify({ sdp: v, action: "req-offer", session: "existing" }) )
+        } else if (models.info.timestamp != localStorage.hubts && (v = localStorage.newRTCAnswer)) {
+          delete localStorage.newRTCAnswer;
+          if ((v = JSON.parse(v)).sdp.length !== 0) {
+            models.peeradd.pc.setRemoteDescription(new RTCSessionDescription( {sdp: v.sdp, type: "answer"} ));
+            models.info.pagestate = "open"
+          }
+        } else if (!localStorage.hubts && models.info.pagestate === "open") {
+          localStorage.hubts = models.info.timestamp;
+          requestConn("new")
+        } else {
+          var lr = models.user.lastRefresh;
+          if (Date.now() - lr > 100 && !models.user.isFresh) {
+            models.user.refresh();
+            models.page.refresh(lr).then(function (payload) {
+              updatePage(payload);
+              broadcastMsg(payload)
+            });
+          }
+        }
+      }
     }
   });
   
-  $.addEvent($("#room > .open-new"), "click", function () {
-    toggleNewItem();
-    messageTitle.focus()
-  });
-  $.addEvent($("#room > .new-post > .cancel"), "click", function () {
-    messageTitle.value = messageBody.value = "";
-    toggleNewItem()
-  });
-  $.addEvent($("#room > .new-post > .send"), "click", sendMessage);
-  $.addEvent(messageBody, "keyup", function (e) {
-    if (e.keyCode === 13 && e.ctrlKey === true) sendMessage.bind(e.target)();
-    return false
-  });
   messageTitle.setAttribute("maxlength", $.charlim.title);
   messageBody.setAttribute("maxlength", $.charlim.body);
-  
-  $.addEvent($("#connect > .create"), "click", function () {
-    ticketTA.innerHTML = "";
-    ticketInfo.innerHTML = "This is a ticket to enter<br />Pass it on";
-    $.toggleClasses({ "#exchange": "hide", "#connect": "hide" });
-    pc.unshift(new RTCPeerConnection(servers, pcConstraint));
-    $.merge(pc[0], {
-      onicecandidate: function (e) {
-        if (e.candidate === null) {
-          if (!models.user.id) models.user.id = "u:" + $.hash(Date.now() + this.localDescription.sdp);
-          ticketTA.value = $.compress(this.localDescription.sdp);
-          ticketTA.select()
-        }
-      }
-    });
-    $.addEvent(ticketTA, "cut copy", function () {
-      $.addEvent(ticketTA, "paste", function () { setTimeout(function () {
-        var adesc = new RTCSessionDescription({sdp: $.decompress(ticketTA.value).replace(/ $/, ""), type: "answer"});
-        pc[0].setRemoteDescription(adesc)
-      }.bind(this), 0) });
-      ticketInfo.innerHTML = "They need to give you their stub<br />Paste it here"
-    });
-    dc.unshift($.merge( pc[0].createDataChannel('moonConn', {reliable: true}), { onopen: openChannel, onmessage: getMessage } ));
-    pc[0].createOffer(function (desc) { pc[0].setLocalDescription(desc, nilfun, nilfun) }, nilfun);
-  });
-
-  $.addEvent($("#connect > .redeem"), "click", function () {
-    ticketTA.innerHTML = "";
-    ticketInfo.innerHTML = "You need a ticket to enter<br />Paste it here";
-    $.toggleClasses({ "#exchange": "hide", "#connect": "hide" });
-    pc.unshift(new RTCPeerConnection(servers, pcConstraint));
-    $.merge(pc[0], {
-      ondatachannel: function (e) { dc.unshift($.merge(e.channel || e, {onopen: openChannel, onmessage: getMessage })) },
-      onicecandidate: function (e) {
-        if (e.candidate == null) {
-          ticketInfo.innerHTML = "Here is your ticket stub<br />Pass it back";
-          models.user.id = "u:" + $.hash(Date.now() + this.localDescription.sdp);
-          ticketTA.value = $.compress(this.localDescription.sdp);
-          ticketTA.select()
-        }
-      }
-    });
-    $.addEvent(ticketTA, "paste", function () { setTimeout(function () {
-      var odesc = new RTCSessionDescription({sdp: $.decompress(ticketTA.value).replace(/ +$/, ""), type: "offer"});
-      pc[0].setRemoteDescription(odesc, function () {
-        pc[0].createAnswer( function (adesc) { pc[0].setLocalDescription(adesc) }, nilfun )
-      }, nilfun)
-    }.bind(this), 0) });
-    ticketTA.focus()
-  });
-  
-  $.addEvent(window, "storage", function () {
-    var lr = models.user.lastRefresh;
-    if (Date.now() - lr > 100 && !models.user.isFresh) {
-      models.user.refresh();
-      models.page.refresh(lr).then(function (payload) {
-        updatePage(payload);
-        broadcastMsg(payload)
-      });
-    }
-  });
+  resize();
   initModels();
+  
   function initModels() {
     return new Promise(function (resolve, reject) {
       models = $.Models();
+      models.info.pagestate = "initialising";
       return models.user.refresh().lastRefresh === -1 ? reject() : resolve()
     }).then(models.page.refresh).then(function (room) {
       return models.txpool.refresh(room)
     }).then(function (room) {
-      openRoom();
-      $.scrollPanel($.scrolling.panel = 1, "easing");
-      updatePage(room)
+      enterRoom();
+      $.scrollPanel($.scrolling.panel = 1, "linear", 0);
+      updatePage(room);
+      localStorage.windowCount++;
+      models.info.pagestate = "connecting";
+      requestConn("existing")
     }).catch(function () {
-      models.user.lastRefresh = Date.now()
+      models.user.lastRefresh = Date.now();
+      localStorage.windowCount = 1;
+      models.info.pagestate = "ready"
     })
   }
   
@@ -573,23 +572,80 @@ function init() {
     })
   }
   
-  function openChannel () {
-    if (dc.length === 1) {
-      dc[0].send( JSON.stringify({ sharestate: { users: [models.user.public] }, action: "open" }) );
-      if (pc[0].ondatachannel !== null) requestConn();
-      if (!$("#page").classList.contains("open")) openRoom()
-      $.toggleClasses({ "#connect": "hide", "#exchange": "hide" });
-    } else {
-      dc[0].send( JSON.stringify({ sharestate: { users: models.page.users }, action: "open" }) );
-      $.toggleClasses({ "#connect": "hide", "#exchange": "hide" })
-    }
-    $.scrollPanel($.scrolling.panel = 1, "easing");
-    if (models.page.room.length !== 0) {
-      this.send( JSON.stringify({ update: models.page.room }) )
-    }
+  function createInvite () {
+    ticketTA.innerHTML = "";
+    ticketInfo.innerHTML = "This is a ticket to enter<br />Pass it on";
+    $.toggleClasses({ "#exchange": "hide", "#connect": "hide" });
+    peers.unshift({ connections: [new RTCPeerConnection(servers, pcConstraint)], dataChannels: [] });
+    $.merge(peers[0].connections[0], {
+      onicecandidate: function (e) {
+        if (e.candidate === null) {
+          if (!models.user.id) models.user.id = "u:" + $.hash(Date.now() + this.localDescription.sdp);
+          ticketTA.value = $.compress(this.localDescription.sdp);
+          ticketTA.select()
+        }
+      },
+      peer: peers[0]
+    });
+    $.addEvent(ticketTA, "cut copy", function () {
+      $.addEvent(ticketTA, "paste", function () { setTimeout(function () {
+        var adesc = new RTCSessionDescription({sdp: $.decompress(ticketTA.value).replace(/ $/, ""), type: "answer"});
+        peers[0].connections[0].setRemoteDescription(adesc)
+      }.bind(this), 0) });
+      ticketInfo.innerHTML = "They need to give you their stub<br />Paste it here"
+    });
+    peers[0].dataChannels.push($.merge( peers[0].connections[0].createDataChannel('moonConn', {reliable: true}), {
+      onopen: openChannel, onmessage: getMessage, onclose: closeConn, pc: peers[0].connections[0]
+    } ));
+    peers[0].connections[0].createOffer( function (desc) { peers[0].connections[0].setLocalDescription(desc, nilfun, nilfun) }, nilfun )
   }
   
-  function openRoom () {
+  function redeemInvite () {
+    ticketTA.innerHTML = "";
+    ticketInfo.innerHTML = "You need a ticket to enter<br />Paste it here";
+    $.toggleClasses({ "#exchange": "hide", "#connect": "hide" });
+    peers.unshift({ connections: [new RTCPeerConnection(servers, pcConstraint)], dataChannels: [] });
+    $.merge(peers[0].connections[0], {
+      ondatachannel: function (e) {
+        peers[0].dataChannels[0] = $.merge(e.channel || e, {
+          onopen: openChannel, onmessage: getMessage, onclose: closeConn, pc: peers[0].connections[0]
+        })
+      },
+      onicecandidate: function (e) {
+        if (e.candidate == null) {
+          ticketInfo.innerHTML = "Here is your ticket stub<br />Pass it back";
+          models.user.id = "u:" + $.hash(Date.now() + this.localDescription.sdp);
+          ticketTA.value = $.compress(this.localDescription.sdp);
+          ticketTA.select()
+        }
+      },
+      peer: peers[0]
+    });
+    $.addEvent(ticketTA, "paste", function () { setTimeout(function () {
+      var odesc = new RTCSessionDescription({sdp: $.decompress(ticketTA.value).replace(/ +$/, ""), type: "offer"});
+      peers[0].connections[0].setRemoteDescription(odesc, function () {
+        peers[0].connections[0].createAnswer( function (adesc) { peers[0].connections[0].setLocalDescription(adesc) }, nilfun )
+      }, nilfun)
+    }.bind(this), 0) });
+    ticketTA.focus()
+  }
+  
+  function openChannel () {
+    if (peers.length === 1) {
+      this.send( JSON.stringify({ sharestate: { self: models.user.public }, action: "open" }) );
+      if (this.pc.ondatachannel !== null) requestConn("new"); //TODO: user-defined maxPeers
+      if (!$("#page").classList.contains("open")) enterRoom()
+      $.toggleClasses({ "#connect": "hide", "#exchange": "hide" });
+    } else {
+      this.send( JSON.stringify({ sharestate: { self: models.user.public, users: models.page.users }, action: "open" }) );
+      $.toggleClasses({ "#connect": "hide", "#exchange": "hide" })
+    }
+    models.info.pagestate = "open";
+    $.scrollPanel($.scrolling.panel = 1, "easing");
+    if (models.page.room.length !== 0) this.send( JSON.stringify({ update: models.page.room }) )
+  }
+  
+  function enterRoom () {
     updatePage({ users: (models.page.users = [models.user.public]) });
     $("#connect > .close").innerHTML = "Abandon " + models.user.id;
     $.toggleClasses({
@@ -599,63 +655,76 @@ function init() {
   }
   
   function closeChannel (e) {
+    models.info.pagestate = "closing";
     $.toggleClasses({ "#page": "open", "#room": "hide", "#users": "hide", "#connect > .redeem": "hide", "#connect > .close": "hide" });
     $.removeAttr(itemsWindow, "data-comment");
     $("#room").classList.remove("active");
     ticketTA.value = itemsWindow.innerHTML = userList.innerHTML = "";
-
-    if (this.constructor.name === "RTCDataChannel") closeConn([this]);
-    if (dc.length !== 0 && dc[0].readyState === "open") {
-      for (var i = 0; i < dc.length; i++) if (dc[i] !== this) dc[i].send( JSON.stringify({
+    if (localStorage.windowCount === 1) {
+      for (var i = 0; i < peers.length; i++) if (peers[i].dataChannels[0].readyState === "open") peers[i].dataChannels[0].send( JSON.stringify({
         sharestate: { users: [models.user.public] },
         action: "close"
       }) );
-      closeConn(dc)
+    } else {
+      if (models.info.timestamp == localStorage.hubts) delete localStorage.hubts;
+      localStorage.windowCount--;
     }
-    e && e.type === "beforeunload" ? models.user.clear() : initModels()
+    closeConn([].concat.apply( [], peers.map(function (p) { return p.dataChannels }) ));
+    if (e && e.type === "beforeunload") {
+      localStorage.windowCount !== 1 || models.user.clear();
+      models.info.pagestate = "closed"
+    } else initModels();
   }
   
-  function closeConn (is) {
-    for (var i = 0, j; i < is.length; i++) {
-      if (is[i].readyState !== "closed") is[i].close();
-      pc[j = dc.indexOf(is[i])] = dc[j] = false;
-    }
-    pc = pc.filter(Boolean);
-    dc = dc.filter(Boolean);
-    if (pc.length === 1) requestConn();
+  function closeConn (dcs) {
+    Array.isArray(dcs) || (dcs = [this]);
+    for (var i = 0; i < dcs.length; i++) if (dcs[i].readyState === "open") dcs[i].close();
+    peers = $.peersprune(peers);
+    if (peers.length === 1) requestConn("new") //TODO: user-defined maxPeers
   }
   
-  function requestConn () {
-    pcw = new RTCPeerConnection(servers, pcConstraint);
-    pcw.onicecandidate = function (e) {
-      if (e.candidate === null) dc[0].send( JSON.stringify({ sdp: this.localDescription.sdp, action: "req-offer" }) )
-    };
-    dcw = $.merge(pcw.createDataChannel('moonConn', {reliable: true}), {
+  function requestConn (session) {
+    models.peeradd = { pc: new RTCPeerConnection(servers, pcConstraint) };
+    $.merge(models.peeradd.pc, {
+      onicecandidate: function (e) {
+        if (e.candidate !== null) return;
+        if (session === "new") peers[0].dataChannels[0].send( JSON.stringify({ sdp: this.localDescription.sdp, action: "req-offer", session: "new" }) );
+        else if (session === "existing") localStorage.newRTCOffer = this.localDescription.sdp
+      }
+    });
+    models.peeradd.dc = $.merge(models.peeradd.pc.createDataChannel('moonConn', {reliable: true}), {
       onmessage: getMessage,
       onopen: function () {
-        dc.unshift(dcw);
-        dcw = null;
-        dc[0].send( JSON.stringify({ sharestate: { users: [models.user.public] }, action: "open" }) );
-      }
+        peers.unshift({ connections: [models.peeradd.pc], dataChannels: [this] });
+        $.merge(peers[0].connections[0], { peer: peers[0] });
+        peers[0].dataChannels[0].send( JSON.stringify({ sharestate: { self: models.user.public }, action: "open" }) );
+        delete models.peeradd
+      },
+      onclose: closeConn,
+      pc: models.peeradd.pc
     });
-    pcw.createOffer(function (desc) { pcw.setLocalDescription(desc, nilfun, nilfun) }, nilfun)
+    models.peeradd.pc.createOffer(function (desc) { models.peeradd.pc.setLocalDescription(desc, nilfun, nilfun) }, nilfun)
   }
   
-  function respondConn (sdp) {
-    pcw = new RTCPeerConnection(servers, pcConstraint);
-    $.merge(pcw, {
-      ondatachannel: function (e) {
-        pc.unshift(pcw);
-        pcw = null;
-        dc.unshift($.merge(e.channel || e, { onmessage: getMessage }))
-        dc[0].send( JSON.stringify({ sharestate: { users: [models.user.public] }, action: "open" }) )
+  function respondConn (dc, data) {
+    var pc = new RTCPeerConnection(servers, pcConstraint);
+    $.merge(pc, {
+      ondatachannel: function (e, i) {
+        if (data.session === "existing") i = dc.pc.peer.connections.push(this);
+        else peers.unshift({ connections: [this], dataChannels: [] });
+        var peer = data.session === "existing" ? dc.pc.peer : peers[0];
+        $.merge(peer.connections[i - 1 || 0], { peer: peer });
+        peer.dataChannels.push( $.merge(e.channel || e, {
+          onopen: function () { this.send( JSON.stringify({ sharestate: { self: models.user.public, users: models.page.users }, action: "open" }) ) },
+          onmessage: getMessage, onclose: closeConn, pc: this
+        }) );
       },
       onicecandidate: function (e) {
-        if (e.candidate === null) models.page.relayc.send( JSON.stringify({ sdp: this.localDescription.sdp, action: "req-answer" }) )
+        if (e.candidate === null) dc.send( JSON.stringify({ sdp: this.localDescription.sdp, action: "req-answer", session: data.session }) )
       }
     });
-    pcw.setRemoteDescription(new RTCSessionDescription({sdp: sdp, type: "offer"}), function () {
-      pcw.createAnswer( function (adesc) { pcw.setLocalDescription(adesc) }, nilfun )
+    pc.setRemoteDescription(new RTCSessionDescription({ sdp: data.sdp, type: "offer" }), function () {
+      pc.createAnswer( function (adesc) { pc.setLocalDescription(adesc) }, nilfun )
     }, nilfun)
   }
   
@@ -665,48 +734,58 @@ function init() {
     if ("update" in data) {
       models.page.update(data.update)
         .then(function (update) {
-          for (updatePage(update); i < dc.length; i++) if (dc[i] !== this) dc[i].send( JSON.stringify({ update: update }) ) //don't send nothing
+          if (!("items" in update) || update.items.length === 0) return;
+          for (updatePage(update); i < peers.length; i++) if (peers[i].dataChannels[0] !== this) peers[i].dataChannels[0].send( JSON.stringify({ update: update }) )
         }.bind(this))
     } else if ("sharestate" in data && "action" in data) {
       if (data.action === "open") {
-        var i, diff = $.usersdiff(data.sharestate.users, models.page.users);
+        var userlist = data.sharestate.users || [data.sharestate.self];
+        if ("self" in data.sharestate) this.pc.peer.user_id = data.sharestate.self.id; // can be spoofed
+        var diff = $.usersdiff(userlist, models.page.users);
         if (diff.length > 0) {
           models.page.users = models.page.users.concat(diff);
-          for (updatePage({ users: diff }); i < dc.length; i++) if (dc[i] !== this) dc[i].send( JSON.stringify({
+          for (updatePage({ users: diff }); i < peers.length; i++) if (peers[i].dataChannels[0] !== this) peers[i].dataChannels[0].send( JSON.stringify({
             sharestate: { users: diff },
             action: "open"
           }) )
         }
       } else if (data.action === "close" || data.action === "remove") {
-        var i, isct = $.usersisct(models.page.users, data.sharestate.users);
+        var isct = $.usersisct(models.page.users, data.sharestate.users);
         if (isct.length > 0) {
           models.page.users = $.usersdiff(models.page.users, isct);
-          for (updatePage({ users: isct }); i < dc.length; i++) if (dc[i] !== this) dc[i].send( JSON.stringify({
+          for (updatePage({ users: isct }); i < peers.length; i++) if (peers[i].dataChannels[0] !== this) peers[i].dataChannels[0].send( JSON.stringify({
             sharestate: { users: isct },
             action: "remove"
           }) )
         }
-        if (data.action === "close") closeConn([this])
+        if (data.action === "close") closeConn()
       }
     } else if ("sdp" in data && "action" in data) {
-      if (data.action === "req-offer") {
-        if (pc.length === 1) {
-          this.send( '{"sdp":"","action":"req-relaya"}' )
-        } else {
-          models.page.relayc = this;
-          (dc[0] === this ? dc[1] : dc[0]).send( JSON.stringify({ sdp: data.sdp, action:"req-relayo" }) )
+      if (data.session === "new") {
+        if (data.action === "req-offer") {
+          if (peers.length === 1) {
+            this.send( '{"sdp":"","action":"req-relaya"}' )
+          } else {
+            (this.pc.peer.relay = peers[this === peers[0].dataChannels[0] ? 1 : 0].dataChannels[0])
+              .send( JSON.stringify({ sdp: data.sdp, action:"req-relayo", session: "new" }) );
+          }
+        } else if (data.action === "req-relayo") respondConn(this, data);
+        else if (data.action === "req-answer") {
+          for (var a = 0; peers[a].relay !== this && peers[a]; a++);
+          peers[a].dataChannels[0].send( JSON.stringify({ sdp: data.sdp, action:"req-relaya", session: "new" }) );
+          delete peers[a].relay
+        } else if (data.action === "req-relaya") {
+          models.peeradd.pc.setRemoteDescription(new RTCSessionDescription( {sdp: data.sdp, type: "answer"} ))
         }
-      } else if (data.action === "req-relayo") {
-          models.page.relayc = this;
-          respondConn(data.sdp);
-      } else if (data.action === "req-answer") {
-        models.page.relayc.send( JSON.stringify({ sdp: data.sdp, action:"req-relaya" }) )
-      } else if (data.action === "req-relaya") {
-        if (data.sdp.length !== 0) {
-          pc.unshift(pcw);
-          pc[0].setRemoteDescription(new RTCSessionDescription( {sdp: data.sdp, type: "answer"} ))
-        }
-        pcw = null
+      } else if (data.session === "existing") {
+        if (data.action === "req-offer") respondConn(this, data);
+        else if (data.action === "req-answer") localStorage.newRTCAnswer = JSON.stringify(data)
+      } else delete models.peeradd
+    } else if ("action" in data) {
+      if (data.action === "closeconn") {
+        var ix = this.pc.peer.connections.indexOf(this);
+        this.close();
+        this.pc.peer.connections.splice(ix, 1)
       }
     }
   }
@@ -745,7 +824,7 @@ function init() {
     broadcastMsg(payload)
   }
   
-  function broadcastMsg (payload) { for (var i = 0; i < dc.length; i++) dc[i].send( JSON.stringify({update: payload}) ) }
+  function broadcastMsg (payload) { for (var i = 0; i < peers.length; i++) peers[i].dataChannels[0].send( JSON.stringify({update: payload}) ) }
 
   function updatePage (payload) {
     var vm = $.validate(payload);
@@ -778,6 +857,9 @@ function init() {
               $.bind(cE_)(".body").innerHTML = $.markdown(payload.items[i].comments[c].body, "body");
               $.bind(cE_)(".user-id").innerHTML = payload.items[i].comments[c].user_data.id;
               $.addAttr($.bind(cE_)(".user-id"), { "data-user": payload.items[i].comments[c].user_data.id });
+              if (models.page.users.map(function (u) { return u.id }).indexOf(payload.items[i].comments[c].user_data.id) === -1) {
+                $.bind(cE_)(".user-id").classList.add("abandoned")
+              }
               return cE_
             })($("#stamps > .item-comment").cloneNode(true)), function (a) {return a.getAttribute("timestamp")}, function (a, b) {return a < b});
             if ($.bind(iE)(".form.hide")) $.bind(iE)(".item > .unread").dataset.num++
@@ -811,17 +893,16 @@ function init() {
     }
     if ("users" in payload) {
       for (var i = 0, u; i < payload.users.length; i++) {
-        if ( u = $("#" + payload.users[i].id.replace(/:/, "\\:")) ) {
-          userList.removeChild(u);
-          $.toggleClasses([[".conversation .user-id[data-user='" + payload.users[i].id + "']", "abandoned"]])
-        } else {
+        if ( u = $("#" + payload.users[i].id.replace(/:/, "\\:")) ) userList.removeChild(u);
+        else {
           $.insert( userList, (function (uE_) {
             $.addAttr(uE_, {id: payload.users[i].id});
             if (payload.users[i].id === models.user.id) $.addAttr(uE_, {"data-self":""});
             $.bind(uE_)(".user-id").innerHTML = payload.users[i].id;
             return uE_
-          })($("#stamps > .connected-user").cloneNode(true)), function (a) { return parseInt(a.getAttribute("id").slice(2, 10), 16) }, function (a, b) {return a < b} );
+          })($("#stamps > .connected-user").cloneNode(true)), function (a) { return a.getAttribute("id") }, function (a, b) {return a < b} );
         }
+        $.toggleClasses([[".conversation .user-id[data-user='" + payload.users[i].id + "']", "abandoned"]]);
       }
     }
   }
