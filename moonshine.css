@@ -25,7 +25,7 @@ ul, ol {
 #page {
   min-height: 100%;
   overflow-y: auto;
-  background-color: #27c142
+  background-image: radial-gradient(100% 150% at 92% -70%, #000 0%, #020736 180%)
 }
 
 #page > * {
@@ -43,6 +43,27 @@ ul, ol {
 #connect {
   font-family: sans-serif;
   flex-direction: row
+}
+
+img.moon {
+  position: absolute;
+  width: 6%;
+  top: 1.5em;
+  right: 8%
+}
+
+.reset {
+  color: white;
+  position: absolute;
+  bottom: 1.1em;
+  right: .5em;
+  cursor: pointer;
+}
+.reset > span {
+  padding: .6em 1em;
+}
+.reset > span:hover {
+  background-color: rgba(255, 255, 255, .2)
 }
 
 .button {
@@ -88,10 +109,10 @@ ul, ol {
   width: 30em
 }
 ::selection {
-  background: rgba(252, 67, 52, .99)
+  background: rgba(255, 159, 44, .99)
 }
 ::-moz-selection {
-  background: rgba(252, 67, 52, .99)
+  background: rgba(255, 159, 44, .99)
 }
 
 #exchange > .info {
@@ -103,7 +124,7 @@ ul, ol {
 
 #room {
   position: relative;
-  background-color: #a5ea30;
+  background-color: rgba(255, 255, 255, .2);
   margin: 0 auto;
   width: 80%;
   flex-flow: row wrap;
@@ -188,11 +209,11 @@ ul, ol {
 .user-id {
   display: inline;
   font-family: monospace;
-  background-color: #e37cb0
+  background-color: #ecd418
 }
 .user-id.abandoned {
   background-color: #fff;
-  color: #c00363
+  color: #7a6d00
 }
 
 .item > span.toggle {
@@ -239,7 +260,7 @@ blockquote {
 }
 
 #users {
-  background: linear-gradient(45deg, #49cb60 25%, transparent 25%, transparent 50%, #49cb60 50%, #49cb60 75%, transparent 75%);
+  background: linear-gradient(45deg, #020736 25%, transparent 25%, transparent 50%, #020736 50%, #020736 75%, transparent 75%);
   background-size: 30px 30px
 }
 
@@ -255,7 +276,7 @@ blockquote {
 .view {
   width: 60%;
   height: 80%;
-  background-color: #a5ea30
+  background-color: rgba(255, 255, 255, .2)
 }
 
 .connected-user[data-self]:after {
